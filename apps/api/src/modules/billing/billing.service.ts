@@ -1148,7 +1148,7 @@ export class BillingService {
         finalTotalMinor: quote.totalMinor,
         promotionId: quote.promotion?.id ?? null,
         idempotencyKey: dto.idempotencyKey,
-        paymentProvider: selectedPaymentProvider,
+        ...(selectedPaymentProvider ? { paymentProvider: selectedPaymentProvider } : {}),
       }).returning();
 
       if (quote.promotion) {
