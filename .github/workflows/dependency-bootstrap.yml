@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/dependency-bootstrap.yml"
+      - "scripts/create-dependency-evidence.mjs"
       - "package.json"
       - "pnpm-workspace.yaml"
       - "apps/*/package.json"
@@ -84,6 +85,8 @@ jobs:
             artifacts/dependency-audit.json
             artifacts/dependency-audit.raw.json
             artifacts/dependency-evidence.json
+            artifacts/dependency-list.raw.json
+            artifacts/dependency-list.stderr.txt
           if-no-files-found: warn
 
       - name: Enforce dependency audit gate
