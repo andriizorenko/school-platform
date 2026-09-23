@@ -7,6 +7,10 @@ on:
       - main
     paths:
       - ".github/workflows/dependency-bootstrap.yml"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
 
 jobs:
   lockfile:
