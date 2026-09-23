@@ -285,7 +285,7 @@ export class SchedulingService {
     session: { id: string; student_id: string; actual_teacher_id: string },
     from: Date,
     to: Date,
-  ) {
+  ): Promise<Array<{ id: string; startsAt: Date; endsAt: Date }>> {
     const result = await executor.execute(sql`
       SELECT id, starts_at, ends_at
       FROM live_sessions
