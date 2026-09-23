@@ -41,7 +41,8 @@ export class PermissionsGuard implements CanActivate {
 
     if (scope) {
       const routeParams = request.params ?? {};
-      const scopeId = routeParams[scope.routeParam];
+      const rawScopeId = routeParams[scope.routeParam];
+      const scopeId = Array.isArray(rawScopeId) ? rawScopeId[0] : rawScopeId;
       const temporaryResults = await Promise.all(
         missing.map((permission) => this.iam.hasTemporaryPermission(user.id, permission, scope.scopeType, scopeId)),
       );
