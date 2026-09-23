@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/dependency-bootstrap.yml"
       - "scripts/create-dependency-evidence.mjs"
+      - "scripts/check-integration.mjs"
       - "package.json"
       - "pnpm-workspace.yaml"
       - "apps/*/package.json"
