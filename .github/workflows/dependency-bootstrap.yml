@@ -2,6 +2,11 @@ name: Dependency Bootstrap
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/dependency-bootstrap.yml"
 
 jobs:
   lockfile:
@@ -38,21 +43,26 @@ jobs:
         run: pnpm verify:static
 
       - name: Dependency security audit
+        id: dependency_audit
+        continue-on-error: true
         run: pnpm release:deps:audit
 
       - name: Dependency graph evidence
+        if: always()
         run: pnpm release:deps:evidence
 
       - name: Ensure bootstrap changed only the lockfile
+        if: always()
         shell: bash
         run: |
           STATUS="$(git status --porcelain --untracked-files=all)"
-          EXTRA="$(printf '%s\n' "$STATUS" | grep -vE '^[ MARC?]{2} pnpm-lock\.yaml$' | grep -v '^$' || true)"
+          EXTRA="$(printf '%s\n' "$STATUS" | grep -vE '^[ MARC?]{2} pnpm-lock\.yaml$' | grep -vE '^\?\? artifacts/' | grep -v '^$' || true)"
           if [ -n "$EXTRA" ]; then
-            echo "Dependency bootstrap unexpectedly modified files other than pnpm-lock.yaml:" >&2
+            echo "Dependency bootstrap unexpectedly modified files other than pnpm-lock.yaml/artifacts:" >&2
             echo "$EXTRA" >&2
             exit 1
           fi
+          mkdir -p artifacts
           if git ls-files --error-unmatch pnpm-lock.yaml >/dev/null 2>&1; then
             git diff -- pnpm-lock.yaml > artifacts/pnpm-lock.patch
           else
@@ -60,6 +70,7 @@ jobs:
           fi
 
       - name: Upload reviewed-lockfile bundle
+        if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: pnpm-lockfile-${{ github.sha }}
@@ -69,4 +80,11 @@ jobs:
             artifacts/dependency-audit.json
             artifacts/dependency-audit.raw.json
             artifacts/dependency-evidence.json
-          if-no-files-found: error
+          if-no-files-found: warn
+
+      - name: Enforce dependency audit gate
+        if: steps.dependency_audit.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "Dependency audit failed. Evidence was uploaded for review." >&2
+          exit 1
