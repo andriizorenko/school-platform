@@ -1,0 +1,112 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - staging_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - staging_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+      args:
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA is required}
+    restart: unless-stopped
+    env_file: .env.staging
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "127.0.0.1:${API_PORT:-3001}:3001"
+    volumes:
+      - staging_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+      args:
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA is required}
+    restart: unless-stopped
+    env_file: .env.staging
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - staging_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA is required}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+    restart: unless-stopped
+    env_file: .env.staging
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      WEB_HOST: ${WEB_HOST:?WEB_HOST is required}
+      API_HOST: ${API_HOST:?API_HOST is required}
+      TLS_ACME_EMAIL: ${TLS_ACME_EMAIL:?TLS_ACME_EMAIL is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - staging_caddy_data:/data
+      - staging_caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+
+volumes:
+  staging_postgres_data:
+  staging_redis_data:
+  staging_storage:
+  staging_caddy_data:
+  staging_caddy_config:

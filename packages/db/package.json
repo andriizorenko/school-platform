@@ -1,0 +1,35 @@
+{
+  "name": "@school/db",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "seed:e2e": "tsx src/seed-e2e.ts"
+  },
+  "dependencies": {
+    "argon2": "^0.44.0",
+    "dotenv": "^16.6.0",
+    "drizzle-orm": "^0.44.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.15.0",
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

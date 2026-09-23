@@ -1,0 +1,1 @@
+"use client";import{useParams}from"next/navigation";import{CourseEnrollmentPage}from"../../../../components/course-content-page";export default function Page(){const p=useParams<{id:string}>();return <CourseEnrollmentPage role="PARENT" enrollmentId={p.id}/>}

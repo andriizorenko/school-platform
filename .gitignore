@@ -1,0 +1,17 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+!.env.staging.example
+*.log
+.DS_Store
+playwright-report/
+test-results/
+backups/
+*.dump
+artifacts/

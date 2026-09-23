@@ -1,0 +1,22 @@
+ARG RELEASE_SHA=unknown
+FROM node:22-bookworm-slim AS build
+ARG RELEASE_SHA
+WORKDIR /app
+ENV CI=true
+RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
+COPY . .
+RUN test -f pnpm-lock.yaml || (echo 'pnpm-lock.yaml is required for release images' >&2; exit 1)
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @school/db build && pnpm --filter @school/api build
+
+FROM node:22-bookworm-slim AS runtime
+ARG RELEASE_SHA
+WORKDIR /app
+ENV NODE_ENV=production
+ENV RELEASE_SHA=${RELEASE_SHA}
+LABEL org.opencontainers.image.title="school-platform-api" \
+      org.opencontainers.image.revision="${RELEASE_SHA}"
+RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
+COPY --from=build /app /app
+EXPOSE 3001
+CMD ["pnpm", "--filter", "@school/api", "start"]

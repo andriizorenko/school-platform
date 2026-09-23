@@ -1,0 +1,1 @@
+export function StatCard({label,value,sub}: {label:string;value:React.ReactNode;sub?:React.ReactNode}) {return <div className="card"><div className="muted">{label}</div><div className="metric">{value}</div>{sub&&<div className="muted" style={{marginTop:6,fontSize:13}}>{sub}</div>}</div>}

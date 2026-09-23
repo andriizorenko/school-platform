@@ -1,0 +1,57 @@
+{
+  "name": "school-platform",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "db:generate": "pnpm --filter @school/db generate",
+    "db:migrate": "pnpm --filter @school/db migrate",
+    "db:seed": "pnpm --filter @school/db seed",
+    "db:build": "pnpm --filter @school/db build",
+    "dev:api": "pnpm --filter @school/db build && pnpm --filter @school/api dev",
+    "foundation:check": "node scripts/check-foundation.mjs",
+    "integration:check": "node scripts/check-integration.mjs",
+    "verify:static": "pnpm foundation:check && pnpm integration:check",
+    "verify": "pnpm verify:static && pnpm typecheck && pnpm test && pnpm build",
+    "db:seed:e2e": "pnpm --filter @school/db seed:e2e",
+    "e2e:api": "node tests/e2e/api-flow.mjs",
+    "e2e:web": "playwright test",
+    "e2e": "pnpm db:seed:e2e && pnpm e2e:api && pnpm db:seed:e2e && pnpm e2e:web",
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "backup:db": "bash scripts/backup-postgres.sh",
+    "restore:db": "bash scripts/restore-postgres.sh",
+    "verify:backup": "bash scripts/verify-postgres-backup.sh",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "release:manifest": "node scripts/create-release-manifest.mjs",
+    "smoke:staging": "pnpm smoke:production && node scripts/staging-smoke.mjs",
+    "lockfile:bootstrap": "bash scripts/bootstrap-lockfile.sh",
+    "acceptance:check": "node scripts/final-beta-check.mjs",
+    "acceptance:beta": "node scripts/final-beta-acceptance.mjs",
+    "release:evidence": "node scripts/verify-release-evidence.mjs",
+    "staging:preflight": "node scripts/staging-env-preflight.mjs",
+    "release:deps:evidence": "node scripts/create-dependency-evidence.mjs",
+    "release:deps:audit": "node scripts/audit-dependencies.mjs",
+    "release:images:evidence": "node scripts/create-image-evidence.mjs"
+  },
+  "devDependencies": {
+    "turbo": "2.11.2",
+    "typescript": "5.9.2",
+    "@playwright/test": "1.63.0"
+  },
+  "engines": {
+    "node": ">=22.0.0 <23",
+    "pnpm": "10.17.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "next": "15.5.26",
+      "typescript": "5.9.2",
+      "@playwright/test": "1.63.0",
+      "turbo": "2.11.2"
+    }
+  }
+}

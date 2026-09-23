@@ -1,0 +1,1 @@
+"use client"; import { useParams } from "next/navigation"; import { StudentDetail } from "../../../../components/student-detail"; export default function Page(){const p=useParams<{id:string}>();return <StudentDetail role="ADMIN" studentId={p.id}/>}

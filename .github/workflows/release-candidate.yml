@@ -1,0 +1,207 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: school_rc
+          POSTGRES_USER: school
+          POSTGRES_PASSWORD: school_rc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U school -d school_rc"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      CI: "true"
+      NODE_ENV: test
+      APP_ENV: rc
+      RELEASE_SHA: ${{ github.sha }}
+      WEB_URL: http://127.0.0.1:3000
+      API_URL: http://127.0.0.1:3001
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001/api
+      API_PORT: 3001
+      DATABASE_URL: postgresql://school:school_rc@127.0.0.1:5432/school_rc
+      SESSION_COOKIE_NAME: school_session
+      SESSION_TTL_DAYS: 30
+      APP_ENCRYPTION_KEY: rc-app-encryption-key-change-me-000000000000
+      MFA_ENCRYPTION_KEY: rc-mfa-encryption-key-change-me-000000000000
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_HASH_KEY: rc-rate-limit-hash-key-change-me-000000000000
+      LOG_HASH_KEY: rc-log-hash-key-change-me-000000000000
+      METRICS_ENABLED: "true"
+      METRICS_TOKEN: rc-metrics-token-change-me-0000000000000000
+      STRICT_ORIGIN_CHECK_ENABLED: "true"
+      SECURITY_HEADERS_ENABLED: "true"
+      TRUST_PROXY_HOPS: 1
+      WORKER_HEARTBEAT_MAX_AGE_SECONDS: 120
+      E2E_ALLOW_SEED: "true"
+      E2E_ALLOW_STAGING_SEED: "true"
+      ACCEPTANCE_REQUIRE_BACKUP: "true"
+      ACCEPTANCE_REQUIRE_HTTPS: "false"
+      POSTGRES_TOOL_MODE: docker
+      E2E_ADMIN_EMAIL: e2e-admin@rc.local
+      E2E_ADMIN_PASSWORD: change-me-e2e-admin-rc
+      E2E_MANAGER_EMAIL: e2e-manager@rc.local
+      E2E_MANAGER_PASSWORD: change-me-e2e-manager-rc
+      E2E_TEACHER_EMAIL: e2e-teacher@rc.local
+      E2E_TEACHER_PASSWORD: change-me-e2e-teacher-rc
+      E2E_PARENT_EMAIL: e2e-parent@rc.local
+      E2E_PARENT_PASSWORD: change-me-e2e-parent-rc
+      E2E_STUDENT_EMAIL: e2e-student@rc.local
+      E2E_STUDENT_PASSWORD: change-me-e2e-student-rc
+      PAYMENT_PROVIDER: NONE
+      PAYMENT_DEFAULT_PROVIDER: MONO
+      LIQPAY_ENABLED: "true"
+      MONO_ENABLED: "true"
+      LIQPAY_PUBLIC_KEY: rc_liqpay_public
+      LIQPAY_PRIVATE_KEY: rc_liqpay_private_key_for_e2e_only
+      LIQPAY_CALLBACK_URL: http://127.0.0.1:3001/api/integrations/payments/liqpay/callback
+      LIQPAY_RESULT_URL: http://127.0.0.1:3000/parent/payments
+      LIQPAY_API_URL: http://127.0.0.1:3099/api/request
+      LIQPAY_CHECKOUT_URL: https://www.liqpay.ua/api/3/checkout
+      LIQPAY_MOCK_PORT: 3099
+      MONO_TOKEN: rc_mono_token
+      MONO_WEBHOOK_URL: http://127.0.0.1:3001/api/integrations/payments/mono/webhook
+      MONO_RESULT_URL: http://127.0.0.1:3000/parent/payments
+      MONO_API_URL: http://127.0.0.1:3100
+      MONO_MOCK_PORT: 3100
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.17.1 --activate
+
+      - name: Release preflight
+        run: node scripts/release-preflight.mjs
+
+      - name: Frozen install
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency security audit
+        run: pnpm release:deps:audit
+
+      - name: Dependency graph evidence
+        run: pnpm release:deps:evidence
+
+      - name: Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Repository verification
+        run: pnpm verify
+
+      - name: Apply migrations and seed E2E
+        run: |
+          pnpm db:migrate
+          pnpm db:seed:e2e
+
+      - name: Release backup / restore rehearsal
+        shell: bash
+        run: |
+          mkdir -p test-results/backups
+          POSTGRES_TOOL_MODE=docker BACKUP_DIR="$PWD/test-results/backups" bash scripts/backup-postgres.sh
+          BACKUP_FILE="$(ls -1t test-results/backups/school-*.dump | head -1)"
+          POSTGRES_TOOL_MODE=docker BACKUP_FILE="$BACKUP_FILE" bash scripts/verify-postgres-backup.sh
+          docker run --rm --network host postgres:17-alpine psql \
+            postgresql://school:school_rc@127.0.0.1:5432/postgres \
+            -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS school_rc_restore"
+          docker run --rm --network host postgres:17-alpine psql \
+            postgresql://school:school_rc@127.0.0.1:5432/postgres \
+            -v ON_ERROR_STOP=1 -c "CREATE DATABASE school_rc_restore"
+          POSTGRES_TOOL_MODE=docker BACKUP_FILE="$BACKUP_FILE" \
+            RESTORE_DATABASE_URL=postgresql://school:school_rc@127.0.0.1:5432/school_rc_restore \
+            CONFIRM_RESTORE=RESTORE bash scripts/restore-postgres.sh
+          MIGRATION_COUNT="$(docker run --rm --network host postgres:17-alpine psql \
+            postgresql://school:school_rc@127.0.0.1:5432/school_rc_restore -Atc 'SELECT count(*) FROM school_migrations')"
+          EXPECTED_MIGRATION_COUNT="$(find packages/db/migrations -maxdepth 1 -name '*.sql' | wc -l | tr -d ' ')"
+          test "$MIGRATION_COUNT" -eq "$EXPECTED_MIGRATION_COUNT"
+          echo "ACCEPTANCE_BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
+
+      - name: Start candidate services
+        shell: bash
+        run: |
+          mkdir -p test-results/runtime
+          node tests/e2e/liqpay-mock.mjs > test-results/runtime/liqpay-mock.log 2>&1 & echo $! > /tmp/liqpay.pid
+          node tests/e2e/mono-mock.mjs > test-results/runtime/mono-mock.log 2>&1 & echo $! > /tmp/mono.pid
+          pnpm --filter @school/api start > test-results/runtime/api.log 2>&1 & echo $! > /tmp/api.pid
+          node apps/worker/dist/main.js > test-results/runtime/worker.log 2>&1 & echo $! > /tmp/worker.pid
+          pnpm --filter @school/web start > test-results/runtime/web.log 2>&1 & echo $! > /tmp/web.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:3001/api/health/ready >/dev/null \
+              && curl -fsS http://127.0.0.1:3001/api/health/worker >/dev/null \
+              && curl -fsS http://127.0.0.1:3000/login >/dev/null \
+              && curl -fsS http://127.0.0.1:3099/health >/dev/null \
+              && curl -fsS http://127.0.0.1:3100/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat test-results/runtime/api.log || true
+          cat test-results/runtime/worker.log || true
+          cat test-results/runtime/web.log || true
+          cat test-results/runtime/liqpay-mock.log || true
+          cat test-results/runtime/mono-mock.log || true
+          exit 1
+
+      - name: Final beta acceptance
+        run: pnpm acceptance:beta
+
+      - name: Build release Docker images
+        run: |
+          docker build --build-arg RELEASE_SHA=${{ github.sha }} -f docker/Dockerfile.api -t school-api:${{ github.sha }} .
+          docker build --build-arg RELEASE_SHA=${{ github.sha }} -f docker/Dockerfile.worker -t school-worker:${{ github.sha }} .
+          docker build --build-arg RELEASE_SHA=${{ github.sha }} --build-arg NEXT_PUBLIC_API_URL=http://127.0.0.1:3001/api -f docker/Dockerfile.web -t school-web:${{ github.sha }} .
+
+      - name: Docker image evidence
+        env:
+          RELEASE_IMAGES: school-api:${{ github.sha }},school-worker:${{ github.sha }},school-web:${{ github.sha }}
+        run: pnpm release:images:evidence
+
+      - name: Release manifest
+        run: pnpm release:manifest
+
+      - name: Verify release evidence binding
+        run: pnpm release:evidence
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: |
+            artifacts/release-manifest.json
+            artifacts/beta-acceptance-report.json
+            artifacts/acceptance
+            artifacts/dependency-evidence.json
+            artifacts/dependency-audit.json
+            artifacts/dependency-audit.raw.json
+            artifacts/image-evidence.json
+            test-results
+            playwright-report
+          if-no-files-found: error
+
+      - name: Stop services
+        if: always()
+        run: |
+          test ! -f /tmp/api.pid || kill "$(cat /tmp/api.pid)" || true
+          test ! -f /tmp/worker.pid || kill "$(cat /tmp/worker.pid)" || true
+          test ! -f /tmp/web.pid || kill "$(cat /tmp/web.pid)" || true
+          test ! -f /tmp/liqpay.pid || kill "$(cat /tmp/liqpay.pid)" || true
+          test ! -f /tmp/mono.pid || kill "$(cat /tmp/mono.pid)" || true
