@@ -1,3 +1,16 @@
+-- Notification audience rows reference canonical IAM roles. Fresh databases run
+-- migrations before application seed, so make those role keys available here.
+INSERT INTO roles(code, name)
+VALUES
+  ('ADMIN', 'Administrator'),
+  ('SUPPORT_MANAGER', 'Support manager'),
+  ('MANAGER', 'Manager'),
+  ('FINANCIER', 'Financier'),
+  ('TEACHER', 'Teacher'),
+  ('PARENT', 'Parent'),
+  ('STUDENT', 'Student')
+ON CONFLICT (code) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS notification_event_roles (
   event_type TEXT NOT NULL REFERENCES notification_event_types(code) ON DELETE CASCADE,
   role_code TEXT NOT NULL REFERENCES roles(code) ON DELETE CASCADE,

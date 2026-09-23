@@ -110,6 +110,15 @@ for (const eventType of notificationRefs) {
   if (!audiencePattern.test(registryText)) fail(`Notification event has no role audience: ${eventType}`);
 }
 
+// 5b) Notification audience migration must be self-contained on a fresh database.
+const notificationAudienceMigration = fs.readFileSync(path.join(root, "packages/db/migrations/0040_notification_audiences.sql"), "utf8");
+for (const roleCode of ["ADMIN", "SUPPORT_MANAGER", "MANAGER", "FINANCIER", "TEACHER", "PARENT", "STUDENT"]) {
+  if (!notificationAudienceMigration.includes(`('${roleCode}',`)) fail(`Notification audience migration does not bootstrap canonical role: ${roleCode}`);
+}
+if (!notificationAudienceMigration.includes("ON CONFLICT (code) DO NOTHING")) {
+  fail("Notification audience migration role bootstrap must be idempotent");
+}
+
 // 6) Nest controller routes must be unique.
 const controllerFiles = sourceFiles.filter((file) => file.includes(`${path.sep}apps${path.sep}api${path.sep}`) && file.endsWith(".controller.ts"));
 const routes = [];
