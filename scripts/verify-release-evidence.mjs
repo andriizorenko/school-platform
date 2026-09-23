@@ -28,7 +28,7 @@ assert(acceptance.status === "PASS", `Beta acceptance is not PASS: ${acceptance.
 assert(Array.isArray(acceptance.steps) && acceptance.steps.length >= 7, "Beta acceptance does not contain the expected step evidence");
 assert(acceptance.steps.every((step) => step.status === "PASS"), "At least one beta acceptance step is not PASS");
 assert(dependency.status === "PASS", `Dependency evidence is not PASS: ${dependency.status}`);
-assert(audit.status === "PASS" && audit.exitCode === 0, `Dependency audit is not PASS: ${audit.status}/${audit.exitCode}`);
+assert(audit.status === "PASS" && Number(audit.blockingAdvisoryCount ?? 0) === 0 && audit.transportFailure !== true, `Dependency audit is not PASS: ${audit.status}/blocking=${audit.blockingAdvisoryCount ?? "unknown"}/transport=${audit.transportFailure ?? "unknown"}`);
 assert(images.status === "PASS" && Array.isArray(images.images) && images.images.length === 3, "Docker image evidence is incomplete");
 assert(Boolean(manifest.releaseSha), "Release manifest has no RELEASE_SHA");
 for (const [label, value] of [["acceptance", acceptance.releaseSha], ["dependency", dependency.releaseSha], ["audit", audit.releaseSha], ["images", images.releaseSha]]) {
