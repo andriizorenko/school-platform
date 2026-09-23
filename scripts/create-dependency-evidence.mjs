@@ -11,7 +11,7 @@ if (!fs.existsSync(lockPath)) throw new Error("pnpm-lock.yaml is required for de
 if (!fs.existsSync(path.join(root, "node_modules"))) throw new Error("node_modules is missing; run pnpm install --frozen-lockfile first");
 
 function runStrict(command, args) {
-  const result = spawnSync(command, args, { cwd: root, encoding: "utf8" });
+  const result = spawnSync(command, args, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} failed (${result.status}): ${(result.stderr || result.stdout || "").slice(0, 1000)}`);
   }
@@ -70,7 +70,7 @@ function collectReportedProblems(value) {
 
 const pnpmVersion = runStrict("pnpm", ["--version"]);
 const listArgs = ["list", "--recursive", "--depth", "1000", "--json"];
-const listResult = spawnSync("pnpm", listArgs, { cwd: root, encoding: "utf8" });
+const listResult = spawnSync("pnpm", listArgs, { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 const listStdout = String(listResult.stdout || "");
 const listStderr = String(listResult.stderr || "");
 fs.writeFileSync(path.join(outDir, "dependency-list.raw.json"), listStdout);
