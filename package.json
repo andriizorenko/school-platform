@@ -52,7 +52,7 @@
       "typescript": "5.9.2",
       "@playwright/test": "1.63.0",
       "turbo": "2.11.2",
-      "postcss": "8.5.18"
+      "postcss": "8.5.23"
     }
   }
 }
