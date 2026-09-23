@@ -1101,6 +1101,8 @@ export class BillingService {
     if (!quote.priceVersionId || quote.unitPriceMinor == null) {
       throw new ConflictException({ code: "SUBJECT_PRICE_NOT_CONFIGURED", message: "Subject price is not configured" });
     }
+    const priceVersionId = quote.priceVersionId;
+    const unitPriceMinor = quote.unitPriceMinor;
 
     const selectedPaymentProvider = quote.totalMinor === 0
       ? null
@@ -1139,10 +1141,10 @@ export class BillingService {
       const [intent] = await tx.insert(lessonCheckoutIntents).values({
         orderId: order.id,
         enrollmentId,
-        subjectPriceVersionId: quote.priceVersionId,
+        subjectPriceVersionId: priceVersionId,
         lessonUnits: dto.lessonUnits,
         creditsToGrant: dto.lessonUnits * 2,
-        baseUnitPriceMinor: quote.unitPriceMinor,
+        baseUnitPriceMinor: unitPriceMinor,
         baseTotalMinor: quote.baseMinor,
         discountMinor: quote.discountMinor,
         finalTotalMinor: quote.totalMinor,
