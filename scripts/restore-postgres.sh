@@ -15,7 +15,8 @@ BACKUP_FILE_ABS="$(cd "$(dirname "$BACKUP_FILE")" && pwd)/$(basename "$BACKUP_FI
 BACKUP_DIR_ABS="$(dirname "$BACKUP_FILE_ABS")"
 BASENAME="$(basename "$BACKUP_FILE_ABS")"
 
-BACKUP_FILE="$BACKUP_FILE_ABS" "$(dirname "$0")/verify-postgres-backup.sh"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKUP_FILE="$BACKUP_FILE_ABS" bash "$SCRIPT_DIR/verify-postgres-backup.sh"
 
 if [[ "$POSTGRES_TOOL_MODE" != "docker" ]] && command -v pg_restore >/dev/null 2>&1; then
   pg_restore --clean --if-exists --no-owner --no-acl --exit-on-error --dbname="$RESTORE_DATABASE_URL" "$BACKUP_FILE_ABS"
