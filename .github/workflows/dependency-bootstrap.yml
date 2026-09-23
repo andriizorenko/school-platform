@@ -8,11 +8,15 @@ on:
     paths:
       - ".github/workflows/dependency-bootstrap.yml"
       - "scripts/create-dependency-evidence.mjs"
+      - "scripts/audit-dependencies.mjs"
       - "scripts/check-integration.mjs"
       - "package.json"
       - "pnpm-workspace.yaml"
       - "apps/*/package.json"
       - "packages/*/package.json"
+
+permissions:
+  contents: write
 
 jobs:
   lockfile:
@@ -96,3 +100,18 @@ jobs:
         run: |
           echo "Dependency audit failed. Evidence was uploaded for review." >&2
           exit 1
+
+      - name: Publish reviewed lockfile branch
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git config user.name "school-platform-bootstrap"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -B bootstrap/pnpm-lockfile
+          git add pnpm-lock.yaml
+          if git diff --cached --quiet; then
+            echo "pnpm-lock.yaml already matches the committed source tree."
+            exit 0
+          fi
+          git commit -m "Commit reviewed pnpm lockfile"
+          git push --force origin HEAD:refs/heads/bootstrap/pnpm-lockfile
