@@ -402,7 +402,7 @@ for (const invariant of ["pnpm-lock.yaml", "packageTreeSha256", "lockfileSha256"
   if (!dependencyEvidence.includes(invariant)) fail(`Dependency evidence is missing invariant: ${invariant}`);
 }
 const dependencyAudit = fs.readFileSync(path.join(root, "scripts/audit-dependencies.mjs"), "utf8");
-for (const invariant of ["--audit-level", "high", "dependency-audit.json", "lockfileSha256"]) {
+for (const invariant of ["gateThreshold", "blockingAdvisoryCount", "transportFailure", "critical", "high", "dependency-audit.json", "lockfileSha256"]) {
   if (!dependencyAudit.includes(invariant)) fail(`Dependency audit is missing invariant: ${invariant}`);
 }
 const imageEvidence = fs.readFileSync(path.join(root, "scripts/create-image-evidence.mjs"), "utf8");
