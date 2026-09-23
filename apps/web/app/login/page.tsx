@@ -24,8 +24,8 @@ export default function LoginPage() {
   return <main className="login"><form className="login-card stack" onSubmit={submit}>
     <div><h1>Вхід до школи</h1><p className="muted">Єдина платформа для навчання, розкладу та операцій школи.</p></div>
     {error && <div className="error">{error}</div>}
-    <div className="field"><label>Email</label><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
-    <div className="field"><label>Пароль</label><input className="input" type="password" value={password} onChange={e=>setPassword(e.target.value)} required /></div>
+    <div className="field"><label htmlFor="login-email">Email</label><input id="login-email" className="input" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
+    <div className="field"><label htmlFor="login-password">Пароль</label><input id="login-password" className="input" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required /></div>
     <button className="btn" disabled={loading}>{loading ? "Входимо…" : "Увійти"}</button><a className="muted" href="/forgot-password">Забули пароль?</a><a className="muted" href="/">← На головну</a>
   </form></main>;
 }

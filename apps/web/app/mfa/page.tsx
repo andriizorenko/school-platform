@@ -118,8 +118,9 @@ function MfaFlow() {
         )}
         {error && <div className="error">{error}</div>}
         <div className="field">
-          <label>Код</label>
+          <label htmlFor="mfa-code">Код</label>
           <input
+            id="mfa-code"
             autoFocus
             className="input"
             value={code}
