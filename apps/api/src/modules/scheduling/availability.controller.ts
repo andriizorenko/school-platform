@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
 import { RequestId } from "../../common/request-id.decorator";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { AuthUser } from "../auth/types";
@@ -7,7 +7,7 @@ import { AvailabilityService } from "./availability.service";
 import { MatchTeachersDto } from "./dto/match-teachers.dto";
 import { SetTeacherAvailabilityDto } from "./dto/set-teacher-availability.dto";
 import { SetAvailabilityExceptionDto } from "./dto/set-availability-exception.dto";
-import { CreateVacationRequestDto, ReviewVacationDto } from "./dto/vacation.dto";
+import { CreateVacationRequestDto } from "./dto/vacation.dto";
 
 @Controller("teachers")
 export class AvailabilityController {
@@ -70,37 +70,5 @@ export class AvailabilityController {
     @RequestId() requestId?: string,
   ) {
     return this.availability.createVacationRequest(teacherId, dto, user, requestId);
-  }
-}
-
-
-@Controller("teacher-vacations")
-export class VacationOperationsController {
-  constructor(private readonly availability: AvailabilityService) {}
-
-  @RequirePermissions("teacher.availability.view")
-  @Get()
-  list(@CurrentUser() user: AuthUser, @Query("status") status?: string) {
-    return this.availability.listVacationRequests(user, status ?? "OPEN");
-  }
-
-  @RequirePermissions("teacher.availability.view")
-  @Get(":vacationId")
-  impact(
-    @Param("vacationId", ParseUUIDPipe) vacationId: string,
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.availability.getVacationImpact(vacationId, user);
-  }
-
-  @RequirePermissions("teacher.availability.manage")
-  @Patch(":vacationId/review")
-  review(
-    @Param("vacationId", ParseUUIDPipe) vacationId: string,
-    @Body() dto: ReviewVacationDto,
-    @CurrentUser() user: AuthUser,
-    @RequestId() requestId?: string,
-  ) {
-    return this.availability.reviewVacation(vacationId, dto, user, requestId);
   }
 }
