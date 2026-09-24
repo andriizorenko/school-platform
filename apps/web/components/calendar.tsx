@@ -76,6 +76,7 @@ function studentName(e: CalendarEvent) { return e.student?.fullName ?? ([e.stude
 function subjectName(e: CalendarEvent) { return e.subject?.name ?? e.subjectName ?? e.subject_name ?? "Предмет"; }
 function sessionType(e: CalendarEvent) { return e.sessionType ?? e.session_type ?? "REGULAR"; }
 function funding(e: CalendarEvent) { return e.fundingStatus ?? e.funding_status ?? "BOOKED"; }
+function lifecycleStatus(e: CalendarEvent) { return (e.status ?? "").toUpperCase(); }
 
 export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query?: string }) {
   const [anchor, setAnchor] = useState(() => new Date());
@@ -164,9 +165,9 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const shift = (amount: number) => setAnchor(d => mode === "month" ? new Date(d.getFullYear(), d.getMonth()+amount, 1) : addDays(d, mode === "day" ? amount : amount*7));
   const teacherLabel = (event: CalendarEvent) => showGlobalFilters && event.teacher?.fullName ? ` · ${event.teacher.fullName}` : "";
 
-  const card = (e: CalendarEvent) => <button key={e.id} className="event" onClick={()=>setSelected(e)}>
+  const card = (e: CalendarEvent) => <button key={e.id} className={`event ${lifecycleStatus(e)==="COMPLETED"?"completed":lifecycleStatus(e)==="CANCELLED"?"cancelled":""}`} onClick={()=>setSelected(e)}>
     <div className="event-time">{timeOnly(eventStart(e))}–{timeOnly(eventEnd(e))}</div>
-    <div className="row" style={{marginTop:6}}><span className={`badge ${sessionType(e)==="FIRST"?"first":""}`}>{sessionType(e)==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${funding(e).toLowerCase()}`}>{funding(e)==="PAID"?"Сплачено":"Бронь"}</span>{(e.needsReport??e.needs_report) && <span className="badge report">ТРЕБА ЗВІТ</span>}</div>
+    <div className="row" style={{marginTop:6}}><span className={`badge ${sessionType(e)==="FIRST"?"first":""}`}>{sessionType(e)==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${funding(e).toLowerCase()}`}>{funding(e)==="PAID"?"Сплачено":"Бронь"}</span>{lifecycleStatus(e)==="COMPLETED"&&<span className="badge success-badge">Проведено</span>}{lifecycleStatus(e)==="CANCELLED"&&<span className="badge cancelled-badge">Скасовано</span>}{(e.needsReport??e.needs_report) && <span className="badge report">ТРЕБА ЗВІТ</span>}</div>
     <div className="event-title">{studentName(e)}</div><div className="muted" style={{fontSize:12}}>{subjectName(e)}{teacherLabel(e)}</div>
   </button>;
 
@@ -213,7 +214,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     {selected && <div className="sheet-backdrop" onClick={()=>setSelected(null)}><aside className="sheet" onClick={e=>e.stopPropagation()}><button className="sheet-close" onClick={()=>setSelected(null)}>×</button>{detailLoading?<div className="empty">Завантаження…</div>:detail?<div className="stack" style={{marginTop:40}}>
       <div><h2>{detail.student.lastName} {detail.student.firstName}</h2><p className="muted">{detail.student.gradeLevel?`${detail.student.gradeLevel} клас · `:""}{detail.subject.name}</p></div>
       <div><strong>{dateTime(detail.startsAt)}</strong><div className="muted">до {timeOnly(detail.endsAt)}</div></div>
-      <div className="row"><span className={`badge ${detail.sessionType==="FIRST"?"first":""}`}>{detail.sessionType==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${detail.fundingStatus.toLowerCase()}`}>{detail.fundingStatus==="PAID"?"Сплачено":"Бронь"}</span>{detail.needsReport&&<span className="badge report">ТРЕБА ЗВІТ</span>}</div>
+      <div className="row"><span className={`badge ${detail.sessionType==="FIRST"?"first":""}`}>{detail.sessionType==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${detail.fundingStatus.toLowerCase()}`}>{detail.fundingStatus==="PAID"?"Сплачено":"Бронь"}</span>{detail.status==="COMPLETED"&&<span className="badge success-badge">Проведено</span>}{detail.status==="CANCELLED"&&<span className="badge cancelled-badge">Скасовано</span>}{detail.needsReport&&<span className="badge report">ТРЕБА ЗВІТ</span>}</div>
       {detail.balanceLessonUnits!==null&&detail.balanceLessonUnits!==undefined&&<div className="card compact-card"><div className="muted">Залишилось</div><strong>{lessonCount(detail.balanceLessonUnits)}</strong></div>}
       <div><div className="muted">Викладач</div><strong>{detail.actualTeacher.lastName} {detail.actualTeacher.firstName}</strong>{detail.actualTeacher.id!==detail.primaryTeacher.id&&<><span className="badge" style={{marginLeft:8}}>Заміна</span><div className="muted" style={{fontSize:12,marginTop:4}}>Основний: {detail.primaryTeacher.lastName} {detail.primaryTeacher.firstName}</div></>}{detail.actualTeacher.phone&&<div>{phoneNumber(detail.actualTeacher.phone)}</div>}</div>
       {detail.parent&&<div><div className="muted">Контакт батьків</div><strong>{detail.parent.lastName} {detail.parent.firstName}</strong>{detail.parent.phone&&<div><a href={`tel:${detail.parent.phone}`}>{phoneNumber(detail.parent.phone)}</a></div>}</div>}
