@@ -321,15 +321,20 @@ export class SchedulingService {
     `);
     if (!result.rowCount) throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
 
-    const session = result.rows[0] as {
+    const rawSession = result.rows[0] as {
       id: string;
       student_id: string;
       enrollment_id: string | null;
       actual_teacher_id: string;
       session_type: "FIRST" | "REGULAR";
-      starts_at: Date;
-      ends_at: Date;
+      starts_at: Date | string;
+      ends_at: Date | string;
       status: string;
+    };
+    const session = {
+      ...rawSession,
+      starts_at: new Date(rawSession.starts_at),
+      ends_at: new Date(rawSession.ends_at),
     };
     if (session.status !== "SCHEDULED") {
       throw new ConflictException({ code: "SESSION_NOT_SCHEDULED", message: "Only scheduled lessons can be moved" });
@@ -1233,7 +1238,7 @@ export class SchedulingService {
           throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
         }
 
-        const session = locked.rows[0] as {
+        const rawSession = locked.rows[0] as {
           id: string;
           student_id: string;
           subject_id: string;
@@ -1241,10 +1246,15 @@ export class SchedulingService {
           primary_teacher_id: string;
           actual_teacher_id: string;
           session_type: "FIRST" | "REGULAR";
-          starts_at: Date;
-          ends_at: Date;
+          starts_at: Date | string;
+          ends_at: Date | string;
           status: string;
           funding_status: string;
+        };
+        const session = {
+          ...rawSession,
+          starts_at: new Date(rawSession.starts_at),
+          ends_at: new Date(rawSession.ends_at),
         };
 
         if (session.status !== "SCHEDULED") {
