@@ -43,14 +43,14 @@ export function AdminCoursesPage() {
 
   return <PlatformShell allowedRoles={["ADMIN"]}>
     <div className="page-head">
-      <div><h1>Курси</h1><p className="muted">Конструктор self-paced курсів, тестів, PDF-матеріалів і планів доступу.</p></div>
+      <div><h1>Курси</h1><p className="muted">Конструктор курсів для самостійного навчання, тестів, PDF-матеріалів і планів доступу.</p></div>
       <button className="btn" onClick={() => setShowCreate(v => !v)}>{showCreate ? "Закрити" : "+ Створити курс"}</button>
     </div>
     {error && <div className="error">{error}</div>}
     {showCreate && <form className="card course-create-form" onSubmit={create}>
       <div className="grid cols-2">
         <div className="field"><label>Назва</label><input className="input" value={title} onChange={e => { setTitle(e.target.value); if (!slug) setSlug(slugify(e.target.value)); }} required /></div>
-        <div className="field"><label>Slug</label><input className="input" value={slug} onChange={e => setSlug(slugify(e.target.value))} required /></div>
+        <div className="field"><label>Адреса курсу (slug)</label><input className="input" value={slug} onChange={e => setSlug(slugify(e.target.value))} required /></div>
         <div className="field"><label>Предмет</label><select className="select" value={subjectId} onChange={e => setSubjectId(e.target.value)}><option value="">Без предмета</option>{subjects.map(subject => <option value={subject.id} key={subject.id}>{subject.name}</option>)}</select></div>
         <div className="field"><label>Опис</label><input className="input" value={description} onChange={e => setDescription(e.target.value)} /></div>
       </div>
