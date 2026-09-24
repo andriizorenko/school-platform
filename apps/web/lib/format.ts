@@ -32,3 +32,35 @@ export function kyivLocalDateTimeToIso(value: string) {
   const sign = offsetMatch[1] === "+" ? "+" : "-";
   return new Date(`${value}:00${sign}${offsetMatch[2]}:${offsetMatch[3]}`).toISOString();
 }
+
+
+const ukPluralRules = new Intl.PluralRules("uk-UA");
+
+export function formatCount(
+  value: number | string | null | undefined,
+  forms: { one: string; few: string; many: string; other?: string },
+) {
+  const count = Number(value ?? 0);
+  const category = ukPluralRules.select(count);
+  const word = category === "one"
+    ? forms.one
+    : category === "few"
+      ? forms.few
+      : category === "many"
+        ? forms.many
+        : (forms.other ?? forms.few);
+  return `${new Intl.NumberFormat("uk-UA").format(count)} ${word}`;
+}
+
+export const lessonCount = (value: number | string | null | undefined) =>
+  formatCount(value, { one: "заняття", few: "заняття", many: "занять", other: "заняття" });
+
+export const subjectCount = (value: number | string | null | undefined) =>
+  formatCount(value, { one: "предмет", few: "предмети", many: "предметів" });
+
+export function phoneNumber(value: string | null | undefined) {
+  if (!value) return "—";
+  const compact = value.replace(/[^+\d]/g, "");
+  const match = /^\+380(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(compact);
+  return match ? `+380 ${match[1]} ${match[2]} ${match[3]} ${match[4]}` : value;
+}
