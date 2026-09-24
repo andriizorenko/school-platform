@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { PlatformShell } from "./platform-shell";
-import { dateTime, money } from "../lib/format";
+import { dateTime, lessonCount, money, subjectCount } from "../lib/format";
 
 export function ParentLearningPage(){
   const[dash,setDash]=useState<any>(null);
@@ -45,9 +45,9 @@ export function ParentLearningPage(){
   function eligibilityFor(studentId:string,enrollmentId:string){return(eligibility[studentId]??[]).find((x:any)=>x.enrollmentId===enrollmentId)}
   function statusCopy(row:any){
     if(!row)return{label:"Перевіряємо",tone:"",text:""};
-    if(row.status==="AVAILABLE")return{label:"Можна запросити",tone:"success-badge",text:`Проведено ${row.completedLessonsSincePreviousReport} занять після попереднього звіту.`};
+    if(row.status==="AVAILABLE")return{label:"Можна запросити",tone:"success-badge",text:`Проведено ${lessonCount(row.completedLessonsSincePreviousReport)} після попереднього звіту.`};
     if(row.status==="PENDING")return{label:"Звіт запитано",tone:"report-alert",text:row.pendingRequest?.targetStartsAt?`Викладач підготує звіт після заняття ${dateTime(row.pendingRequest.targetStartsAt)}.`:"Запит уже у викладача; цільове заняття ще не призначене."};
-    if(row.status==="TOO_EARLY")return{label:`${row.completedLessonsSincePreviousReport}/${row.requiredLessons} занять`,tone:"",text:`Щоб запросити новий звіт, потрібно ще ${row.remainingLessons} ${row.remainingLessons===1?"заняття":"занять"}.`};
+    if(row.status==="TOO_EARLY")return{label:`${row.completedLessonsSincePreviousReport}/${row.requiredLessons} занять`,tone:"",text:`Щоб запросити новий звіт, потрібно ще ${lessonCount(row.remainingLessons)}.`};
     if(row.status==="NO_TEACHER")return{label:"Без викладача",tone:"",text:"Запит стане доступним після призначення основного викладача."};
     return{label:"Навчання неактивне",tone:"",text:"Для неактивного предмета новий звіт не запитується."};
   }
@@ -66,7 +66,7 @@ export function ParentLearningPage(){
       {(dash?.students??[]).map((student:any)=><section className="parent-learning-student" key={student.id}>
         <div className="parent-learning-student-head">
           <div><h2>{student.lastName} {student.firstName}</h2><p className="muted">{student.gradeLevel?`${student.gradeLevel} клас`:"Клас не вказано"}</p></div>
-          <span className="badge">{student.enrollments?.length??0} предмети</span>
+          <span className="badge">{subjectCount(student.enrollments?.length ?? 0)}</span>
         </div>
         <div className="stack">{(student.enrollments??[]).map((enrollment:any)=>{
           const gate=eligibilityFor(student.id,enrollment.id);const status=statusCopy(gate);
@@ -75,7 +75,7 @@ export function ParentLearningPage(){
           return <article className="card parent-subject-card" key={enrollment.id}>
             <div className="parent-subject-head">
               <div><div className="row"><h2>{enrollment.subject.name}</h2><span className={`badge ${enrollment.status==="ACTIVE"?"success-badge":""}`}>{enrollment.status==="ACTIVE"?"Активне":enrollment.status==="PAUSED"?"Пауза":"Неактивне"}</span></div><div className="muted">{enrollment.primaryTeacher?`${enrollment.primaryTeacher.lastName} ${enrollment.primaryTeacher.firstName}`:"Викладача не призначено"}</div></div>
-              <div className="parent-subject-balance"><span className="muted">Залишилось</span><strong>{enrollment.balanceLessonUnits} заняття</strong></div>
+              <div className="parent-subject-balance"><span className="muted">Залишилось</span><strong>{lessonCount(enrollment.balanceLessonUnits)}</strong></div>
             </div>
 
             <div className="parent-report-request-box">
