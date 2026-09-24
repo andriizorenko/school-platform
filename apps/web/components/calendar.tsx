@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { dateOnly, dateTime, timeOnly } from "../lib/format";
+import { dateOnly, dateTime, lessonCount, phoneNumber, timeOnly } from "../lib/format";
 import { SessionActions } from "./session-actions";
 
 export type CalendarRole = "ADMIN" | "MANAGER" | "TEACHER" | "PARENT" | "STUDENT";
@@ -176,6 +176,12 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
 
   const fixedSessionType = fixedQuery.get("sessionType") ?? "";
   const fixedFundingStatus = fixedQuery.get("fundingStatus") ?? "";
+  const todayKey = dateParam(new Date());
+  const periodLabel = mode === "month"
+    ? new Intl.DateTimeFormat("uk-UA", { month: "long", year: "numeric", timeZone: "Europe/Kyiv" }).format(anchor)
+    : mode === "day"
+      ? dateOnly(anchor)
+      : `${dateOnly(range.from)} — ${dateOnly(range.to)}`;
 
   return <>
     {showGlobalFilters && <div className="card calendar-filters">
@@ -183,22 +189,23 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
         <div className="field"><label>Викладач</label><select className="select" disabled={filtersLoading} value={filters.teacherId} onChange={e=>updateFilter("teacherId",e.target.value)}><option value="">Усі викладачі</option>{filterOptions?.teachers.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
         <div className="field"><label>Учень</label><select className="select" disabled={filtersLoading} value={filters.studentId} onChange={e=>updateFilter("studentId",e.target.value)}><option value="">Усі учні</option>{filterOptions?.students.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
         <div className="field"><label>Предмет</label><select className="select" disabled={filtersLoading} value={filters.subjectId} onChange={e=>updateFilter("subjectId",e.target.value)}><option value="">Усі предмети</option>{filterOptions?.subjects.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-        <div className="field"><label>Primary manager</label><select className="select" disabled={filtersLoading} value={filters.managerId} onChange={e=>updateFilter("managerId",e.target.value)}><option value="">Усі менеджери</option>{filterOptions?.managers.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
-        <div className="field"><label>Тип</label><select className="select" disabled={Boolean(fixedSessionType)} value={fixedSessionType || filters.sessionType} onChange={e=>updateFilter("sessionType",e.target.value)}><option value="">Усі</option><option value="FIRST">Перше</option><option value="REGULAR">Регулярне</option></select></div>
-        <div className="field"><label>Оплата</label><select className="select" disabled={Boolean(fixedFundingStatus)} value={fixedFundingStatus || filters.fundingStatus} onChange={e=>updateFilter("fundingStatus",e.target.value)}><option value="">Усі</option><option value="PAID">Сплачено</option><option value="BOOKED">Бронь</option></select></div>
+        <div className="field"><label>Основний менеджер</label><select className="select" disabled={filtersLoading} value={filters.managerId} onChange={e=>updateFilter("managerId",e.target.value)}><option value="">Усі менеджери</option>{filterOptions?.managers.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
+        <div className="field"><label>Тип заняття</label><select className="select" disabled={Boolean(fixedSessionType)} value={fixedSessionType || filters.sessionType} onChange={e=>updateFilter("sessionType",e.target.value)}><option value="">Усі</option><option value="FIRST">Перше</option><option value="REGULAR">Регулярне</option></select></div>
+        <div className="field"><label>Статус оплати</label><select className="select" disabled={Boolean(fixedFundingStatus)} value={fixedFundingStatus || filters.fundingStatus} onChange={e=>updateFilter("fundingStatus",e.target.value)}><option value="">Усі</option><option value="PAID">Сплачено</option><option value="BOOKED">Бронь</option></select></div>
       </div>
       <div className="row calendar-filter-actions"><button type="button" className="btn secondary" onClick={()=>setFilters(EMPTY_FILTERS)}>Скинути фільтри</button><span className="muted">Знайдено занять: {events.length}</span></div>
     </div>}
 
     <div className="calendar-toolbar">
       <div className="row"><button className="btn secondary" onClick={()=>shift(-1)}>←</button><button className="btn secondary" onClick={()=>setAnchor(new Date())}>Сьогодні</button><button className="btn secondary" onClick={()=>shift(1)}>→</button></div>
+      <strong className="calendar-period">{periodLabel}</strong>
       <div className="row calendar-modes desktop-modes"><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button><button className={`btn ${mode==="month"?"":"secondary"}`} onClick={()=>setMode("month")}>Місяць</button></div>
       <div className="row calendar-modes mobile-modes"><button className={`btn ${mode==="day"?"":"secondary"}`} onClick={()=>setMode("day")}>День</button><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button></div>
     </div>
     {error && <div className="error" style={{marginBottom:12}}>{error}</div>}
 
-    {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className="calendar-month-day" key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
-      <div className="calendar-week">{days.map(d => <section className="calendar-day" key={dateParam(d)}><h3>{dateOnly(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted" style={{fontSize:12}}>Немає занять</div>}</section>)}</div>
+    {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
+      <div className="calendar-week">{days.map(d => <section className={`calendar-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><h3>{dateOnly(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted" style={{fontSize:12}}>Немає занять</div>}</section>)}</div>
       <div className="mobile-day-nav">{days.map(d => <button key={dateParam(d)} onClick={()=>refs.current[dateParam(d)]?.scrollIntoView({behavior:"smooth",block:"start"})}>{new Intl.DateTimeFormat("uk-UA",{weekday:"short",timeZone:"Europe/Kyiv"}).format(d)}<br/><small>{d.getDate()}</small></button>)}</div>
       <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
     </>}
@@ -207,9 +214,9 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       <div><h2>{detail.student.lastName} {detail.student.firstName}</h2><p className="muted">{detail.student.gradeLevel?`${detail.student.gradeLevel} клас · `:""}{detail.subject.name}</p></div>
       <div><strong>{dateTime(detail.startsAt)}</strong><div className="muted">до {timeOnly(detail.endsAt)}</div></div>
       <div className="row"><span className={`badge ${detail.sessionType==="FIRST"?"first":""}`}>{detail.sessionType==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${detail.fundingStatus.toLowerCase()}`}>{detail.fundingStatus==="PAID"?"Сплачено":"Бронь"}</span>{detail.needsReport&&<span className="badge report">ТРЕБА ЗВІТ</span>}</div>
-      {detail.balanceLessonUnits!==null&&detail.balanceLessonUnits!==undefined&&<div className="card compact-card"><div className="muted">Залишилось</div><strong>{detail.balanceLessonUnits} заняття</strong></div>}
-      <div><div className="muted">Викладач</div><strong>{detail.actualTeacher.lastName} {detail.actualTeacher.firstName}</strong>{detail.actualTeacher.id!==detail.primaryTeacher.id&&<><span className="badge" style={{marginLeft:8}}>Заміна</span><div className="muted" style={{fontSize:12,marginTop:4}}>Основний: {detail.primaryTeacher.lastName} {detail.primaryTeacher.firstName}</div></>}{detail.actualTeacher.phone&&<div>{detail.actualTeacher.phone}</div>}</div>
-      {detail.parent&&<div><div className="muted">Контакт батьків</div><strong>{detail.parent.lastName} {detail.parent.firstName}</strong>{detail.parent.phone&&<div><a href={`tel:${detail.parent.phone}`}>{detail.parent.phone}</a></div>}</div>}
+      {detail.balanceLessonUnits!==null&&detail.balanceLessonUnits!==undefined&&<div className="card compact-card"><div className="muted">Залишилось</div><strong>{lessonCount(detail.balanceLessonUnits)}</strong></div>}
+      <div><div className="muted">Викладач</div><strong>{detail.actualTeacher.lastName} {detail.actualTeacher.firstName}</strong>{detail.actualTeacher.id!==detail.primaryTeacher.id&&<><span className="badge" style={{marginLeft:8}}>Заміна</span><div className="muted" style={{fontSize:12,marginTop:4}}>Основний: {detail.primaryTeacher.lastName} {detail.primaryTeacher.firstName}</div></>}{detail.actualTeacher.phone&&<div>{phoneNumber(detail.actualTeacher.phone)}</div>}</div>
+      {detail.parent&&<div><div className="muted">Контакт батьків</div><strong>{detail.parent.lastName} {detail.parent.firstName}</strong>{detail.parent.phone&&<div><a href={`tel:${detail.parent.phone}`}>{phoneNumber(detail.parent.phone)}</a></div>}</div>}
       {detail.actualTeacher.zoomUrl&&<a className="btn" href={detail.actualTeacher.zoomUrl} target="_blank" rel="noreferrer">Приєднатися до Zoom</a>}
       {actionError&&<div className="error">{actionError}</div>}
       <SessionActions role={role} detail={detail} onSuccess={async()=>{await loadEvents();setSelected(null);}} />
