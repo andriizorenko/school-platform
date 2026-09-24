@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PlatformShell } from "./platform-shell";
 import { useData } from "../lib/use-data";
 import { ErrorCard, LoadingCard } from "./loadable";
-import { dateTime } from "../lib/format";
+import { dateTime, lessonCount, phoneNumber } from "../lib/format";
 
 export function StudentDashboard() {
   const { data, error, loading } = useData<any>("/student/dashboard");
@@ -44,9 +44,9 @@ export function StudentDashboard() {
           const teacher = enrollment.primaryTeacher;
           return <article className="card student-home-subject-card" key={enrollment.id}>
             <div className="row subject-line"><h2>{enrollment.subject.name}</h2><span className={`badge ${enrollment.status === "ACTIVE" ? "success-badge" : enrollment.status === "PAUSED" ? "booked" : ""}`}>{enrollment.status === "ACTIVE" ? "Активне" : enrollment.status === "PAUSED" ? "Пауза" : "Неактивне"}</span></div>
-            <div className="metric">{enrollment.balanceLessonUnits}</div>
-            <div className="muted">занять залишилось</div>
-            {teacher && <div className="student-home-teacher"><strong>{teacher.lastName} {teacher.firstName}</strong>{teacher.phone && <a className="muted" href={`tel:${teacher.phone}`}>{teacher.phone}</a>}</div>}
+            <div className="metric">{lessonCount(enrollment.balanceLessonUnits)}</div>
+            <div className="muted">залишилось</div>
+            {teacher && <div className="student-home-teacher"><strong>{teacher.lastName} {teacher.firstName}</strong>{teacher.phone && <a className="muted" href={`tel:${teacher.phone}`}>{phoneNumber(teacher.phone)}</a>}</div>}
             <Link className="btn secondary" href="/student/journal">Журнал і прогрес</Link>
           </article>;
         })}
