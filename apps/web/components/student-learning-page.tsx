@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { dateTime } from "../lib/format";
+import { dateTime, lessonCount, phoneNumber } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 
 type StudentDashboardData = {
@@ -195,7 +195,7 @@ export function StudentLearningPage() {
             </div>
             <div className="student-balance-box">
               <span className="muted">Залишилось</span>
-              <strong>{enrollment.balanceLessonUnits} заняття</strong>
+              <strong>{lessonCount(enrollment.balanceLessonUnits)}</strong>
             </div>
           </div>
 
@@ -218,7 +218,7 @@ export function StudentLearningPage() {
               {teacher ? <>
                 <strong>{teacher.lastName} {teacher.firstName}</strong>
                 <div className="row student-contact-actions">
-                  {teacher.phone && <a className="btn secondary" href={`tel:${teacher.phone}`}>{teacher.phone}</a>}
+                  {teacher.phone && <a className="btn secondary" href={`tel:${teacher.phone}`}>{phoneNumber(teacher.phone)}</a>}
                   {teacher.telegramUsername && <a className="btn secondary" target="_blank" rel="noreferrer" href={`https://t.me/${teacher.telegramUsername.replace(/^@/, "")}`}>@{teacher.telegramUsername.replace(/^@/, "")}</a>}
                 </div>
               </> : <span className="muted">Контакт зʼявиться після призначення викладача.</span>}
