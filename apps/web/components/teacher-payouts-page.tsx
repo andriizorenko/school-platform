@@ -11,7 +11,7 @@ const typeLabel: Record<string, string> = {
   REGULAR_60: "Регулярне 60 хв",
   REGULAR_30: "Регулярне 30 хв",
   FIRST_LESSON: "Перше заняття",
-  PAID_STUDENT_NO_SHOW: "Оплачений no-show",
+  PAID_STUDENT_NO_SHOW: "Оплачений пропуск",
   COMPENSATION: "Компенсаційне",
   ADJUSTMENT: "Коригування",
 };
@@ -96,10 +96,10 @@ export function TeacherPayoutsPage() {
             <div className="card">
               <div className="muted">Коригування минулих періодів</div>
               <div className="metric">{money(data.pendingAdjustmentsMinor)}</div>
-              <div className="muted">Потраплять у найближчу ще не закриту виплату.</div>
+              <div className="muted">Будуть враховані в найближчій виплаті, яку ще не закрито.</div>
             </div>
             <div className="card">
-              <div className="muted">Разом ще не закрито</div>
+              <div className="muted">Очікує на виплату</div>
               <div className="metric">{money(data.currentAccruedMinor)}</div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export function TeacherPayoutsPage() {
 
           <form className="card stack" onSubmit={saveDetails}>
             <h2>Реквізити для виплати</h2>
-            <p className="muted">Повні реквізити зашифровані. Після фактичної виплати її snapshot стає незмінним.</p>
+            <p className="muted">Повні реквізити зберігаються в зашифрованому вигляді. Після фактичної виплати зафіксовані для неї реквізити вже не змінюються.</p>
             <div className="grid cols-2">
               <div className="field"><label>Тип</label><input className="input" value={destinationType} onChange={(event) => setDestinationType(event.target.value)} /></div>
               <div className="field"><label>Маскований вигляд</label><input className="input" value={maskedDisplay} onChange={(event) => setMaskedDisplay(event.target.value)} placeholder="•••• 4821" required /></div>
