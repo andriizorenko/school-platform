@@ -152,6 +152,10 @@ async function run() {
   expectStatus(managerSettings, 403, "manager settings denied");
   assert.equal(managerSettings.payload?.error?.code, "PERMISSION_DENIED");
 
+  const managerVacations = await request("/teacher-vacations?status=OPEN", { cookie: manager.cookie });
+  expectStatus(managerVacations, 200, "manager vacation queue");
+  assert.ok(Array.isArray(managerVacations.payload), "manager vacation queue must return an array");
+
   const teacher = await login(accounts.teacher);
   expectStatus(await request("/teachers/me/profile", { cookie: teacher.cookie }), 200, "teacher self profile");
   expectStatus(await request("/teachers/me/students", { cookie: teacher.cookie }), 200, "teacher students");
@@ -161,6 +165,13 @@ async function run() {
   const parentDashboard = await request("/parent/dashboard", { cookie: parent.cookie });
   expectStatus(parentDashboard, 200, "parent dashboard");
   assert.ok(parentDashboard.payload?.students?.length >= 1, "parent fixture must expose at least one linked student");
+
+  const parentCourses = await request("/portal/courses", { cookie: parent.cookie });
+  expectStatus(parentCourses, 200, "parent course portal");
+  assert.ok(Array.isArray(parentCourses.payload), "parent course portal must return an array");
+  const parentCourseCatalog = await request("/courses", { cookie: parent.cookie });
+  expectStatus(parentCourseCatalog, 200, "parent course catalog");
+  assert.ok(Array.isArray(parentCourseCatalog.payload), "parent course catalog must return an array");
   const parentAsStudent = await request("/student/dashboard", { cookie: parent.cookie });
   expectStatus(parentAsStudent, 403, "parent cannot use student dashboard");
   assert.equal(parentAsStudent.payload?.error?.code, "STUDENT_PORTAL_ONLY");
