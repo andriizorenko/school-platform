@@ -53,7 +53,7 @@ export class LessonsService {
         throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
       }
 
-      const session = locked.rows[0] as {
+      const rawSession = locked.rows[0] as {
         id: string;
         enrollment_id: string | null;
         subject_id: string;
@@ -61,8 +61,13 @@ export class LessonsService {
         session_type: string;
         funding_status: string;
         status: string;
-        starts_at: Date;
-        ends_at: Date;
+        starts_at: Date | string;
+        ends_at: Date | string;
+      };
+      const session = {
+        ...rawSession,
+        starts_at: new Date(rawSession.starts_at),
+        ends_at: new Date(rawSession.ends_at),
       };
 
       if (session.session_type !== "REGULAR" || !session.enrollment_id) {
