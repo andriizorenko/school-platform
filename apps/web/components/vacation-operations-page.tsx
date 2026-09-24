@@ -67,7 +67,7 @@ export function VacationOperationsPage({ role }: { role: Role }) {
     setError("");
     setLoading(true);
     try {
-      const data = await api<VacationSummary[]>("/teachers/vacations?status=OPEN");
+      const data = await api<VacationSummary[]>("/teacher-vacations?status=OPEN");
       setItems(data);
       if (selectedId && !data.some((item) => item.id === selectedId)) {
         setSelectedId(null);
@@ -88,7 +88,7 @@ export function VacationOperationsPage({ role }: { role: Role }) {
     setCandidates([]);
     setSelectedCandidate("");
     try {
-      const data = await api<VacationImpact>(`/teachers/vacations/${id}`);
+      const data = await api<VacationImpact>(`/teacher-vacations/${id}`);
       setDetail(data);
     } catch (exception: any) {
       setError(exception?.message ?? "Не вдалося завантажити заняття відпустки");
@@ -104,7 +104,7 @@ export function VacationOperationsPage({ role }: { role: Role }) {
     setBusyKey(`review:${status}`);
     setError(""); setMessage("");
     try {
-      await api(`/teachers/vacations/${selectedId}/review`, {
+      await api(`/teacher-vacations/${selectedId}/review`, {
         method: "PATCH",
         body: JSON.stringify({ status, comment: reviewComment.trim() || undefined }),
       });
