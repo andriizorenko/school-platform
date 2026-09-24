@@ -433,7 +433,9 @@ for (const invariant of ["dependency-evidence.json", "dependency-audit.json", "i
 const releasePreflightSource = fs.readFileSync(path.join(root, "scripts/release-preflight.mjs"), "utf8");
 if (!releasePreflightSource.includes("git") || !releasePreflightSource.includes("pnpm-lock.yaml exists but is not committed/tracked by git") || !releasePreflightSource.includes("pnpm-lock.yaml must match committed HEAD before a release run")) fail("Release preflight must reject untracked or uncommitted lockfiles on real release runs");
 if (!releaseManifestSource.includes("Required release evidence is missing") || !releaseManifestSource.includes("formatVersion: 2")) fail("Release manifest must bind v33 evidence files and use formatVersion 2");
-if (!releaseManifestSource.includes('.env.staging.example')) fail("Release manifest must include the staging env template in the source hash");
+for (const invariant of ['git", ["ls-files", "-z"]', 'sourceMode: "git-tracked"']) {
+  if (!releaseManifestSource.includes(invariant)) fail(`Release manifest must hash Git-tracked source only: missing ${invariant}`);
+}
 
 if (failures.length) {
   console.error(`Integration check failed (${failures.length}):`);
