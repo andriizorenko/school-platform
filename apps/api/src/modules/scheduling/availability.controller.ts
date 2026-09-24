@@ -13,32 +13,6 @@ import { CreateVacationRequestDto, ReviewVacationDto } from "./dto/vacation.dto"
 export class AvailabilityController {
   constructor(private readonly availability: AvailabilityService) {}
 
-  @RequirePermissions("teacher.availability.view")
-  @Get("vacations")
-  listVacations(@CurrentUser() user: AuthUser, @Query("status") status?: string) {
-    return this.availability.listVacationRequests(user, status ?? "OPEN");
-  }
-
-  @RequirePermissions("teacher.availability.view")
-  @Get("vacations/:vacationId")
-  vacationImpact(
-    @Param("vacationId", ParseUUIDPipe) vacationId: string,
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.availability.getVacationImpact(vacationId, user);
-  }
-
-  @RequirePermissions("teacher.availability.manage")
-  @Patch("vacations/:vacationId/review")
-  review(
-    @Param("vacationId", ParseUUIDPipe) vacationId: string,
-    @Body() dto: ReviewVacationDto,
-    @CurrentUser() user: AuthUser,
-    @RequestId() requestId?: string,
-  ) {
-    return this.availability.reviewVacation(vacationId, dto, user, requestId);
-  }
-
   @RequirePermissions("teacher.view")
   @Post("match-schedule")
   matchTeachers(
@@ -96,5 +70,37 @@ export class AvailabilityController {
     @RequestId() requestId?: string,
   ) {
     return this.availability.createVacationRequest(teacherId, dto, user, requestId);
+  }
+}
+
+
+@Controller("teacher-vacations")
+export class VacationOperationsController {
+  constructor(private readonly availability: AvailabilityService) {}
+
+  @RequirePermissions("teacher.availability.view")
+  @Get()
+  list(@CurrentUser() user: AuthUser, @Query("status") status?: string) {
+    return this.availability.listVacationRequests(user, status ?? "OPEN");
+  }
+
+  @RequirePermissions("teacher.availability.view")
+  @Get(":vacationId")
+  impact(
+    @Param("vacationId", ParseUUIDPipe) vacationId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.availability.getVacationImpact(vacationId, user);
+  }
+
+  @RequirePermissions("teacher.availability.manage")
+  @Patch(":vacationId/review")
+  review(
+    @Param("vacationId", ParseUUIDPipe) vacationId: string,
+    @Body() dto: ReviewVacationDto,
+    @CurrentUser() user: AuthUser,
+    @RequestId() requestId?: string,
+  ) {
+    return this.availability.reviewVacation(vacationId, dto, user, requestId);
   }
 }
