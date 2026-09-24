@@ -15,6 +15,14 @@ const accounts = {
   student: { email: required("E2E_STUDENT_EMAIL"), password: required("E2E_STUDENT_PASSWORD"), home: "/student", role: "STUDENT" },
 } as const;
 
+const roleLabels: Record<(typeof accounts)[keyof typeof accounts]["role"], string> = {
+  ADMIN: "Адміністратор",
+  MANAGER: "Менеджер",
+  TEACHER: "Викладач",
+  PARENT: "Батьки",
+  STUDENT: "Учень",
+};
+
 function base32Decode(input: string) {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   let bits = 0;
@@ -52,7 +60,7 @@ async function login(page: Page, account: (typeof accounts)[keyof typeof account
 async function expectHome(page: Page, account: (typeof accounts)[keyof typeof accounts]) {
   await expect(page).toHaveURL(new RegExp(`${account.home.replace("/", "\\/")}$`));
   await expect(page.getByText(account.email, { exact: false })).toBeVisible();
-  await expect(page.getByText(account.role, { exact: true })).toBeVisible();
+  await expect(page.getByText(roleLabels[account.role], { exact: true })).toBeVisible();
   await expect(page.locator(".error")).toHaveCount(0);
 }
 
