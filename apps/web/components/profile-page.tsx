@@ -37,6 +37,16 @@ type NotificationItem = {
   createdAt: string;
 };
 
+const roleLabel: Record<string, string> = {
+  ADMIN: "Адміністратор",
+  SUPPORT_MANAGER: "Менеджер підтримки",
+  MANAGER: "Менеджер",
+  FINANCIER: "Фінансист",
+  TEACHER: "Викладач",
+  PARENT: "Батьки",
+  STUDENT: "Учень",
+};
+
 const eventCopy: Record<string, { title: string; help: string }> = {
   LESSON_REMINDER: { title: "Нагадування про заняття", help: "За 1 годину до початку уроку." },
   LESSON_RESCHEDULED: { title: "Перенесення заняття", help: "Коли час конкретного уроку змінено." },
@@ -225,7 +235,7 @@ export function ProfilePage() {
           <h2>Акаунт</h2>
           <div>
             <strong>{me?.email ?? "…"}</strong>
-            <div className="muted">{me?.roles.join(" · ")}</div>
+            <div className="muted">{me?.roles.map((role) => roleLabel[role] ?? role).join(" · ")}</div>
           </div>
           {privileged && (
             <div className="row">
@@ -285,11 +295,11 @@ export function ProfilePage() {
                 </div>
                 <div className="row notification-setting-control">
                   {!pref.userConfigurable && <span className="badge first">Обовʼязкове</span>}
-                  <label className={`switch ${!pref.userConfigurable ? "disabled" : ""}`} aria-label={copy.title}>
+                  <label className={`switch ${!pref.userConfigurable || telegram?.status !== "ACTIVE" ? "disabled" : ""}`} aria-label={copy.title}>
                     <input
                       type="checkbox"
                       checked={pref.channels.TELEGRAM}
-                      disabled={!pref.userConfigurable || busyEvent === pref.eventType}
+                      disabled={!pref.userConfigurable || telegram?.status !== "ACTIVE" || busyEvent === pref.eventType}
                       onChange={() => void toggle(pref)}
                     />
                     <span />
