@@ -69,6 +69,9 @@ tr:last-child td { border-bottom: 0; }
 .calendar-day h3 { margin: 0 0 10px; font-size: 14px; position: sticky; top: 0; background: white; padding: 4px 0; }
 .event { width: 100%; text-align: left; background: #fff; color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 10px; padding: 9px; margin-bottom: 8px; }
 .event:hover { box-shadow: 0 4px 14px rgba(16,24,40,.08); }
+.event.completed { border-left-color: var(--success); background: #f6fef9; }
+.event.cancelled { opacity: .7; border-left-color: var(--muted); background: #f9fafb; }
+.cancelled-badge { background:#f2f4f7; color:var(--muted); }
 .event-time { font-weight: 800; }
 .event-title { margin-top: 4px; font-size: 13px; font-weight: 650; }
 .mobile-day-nav { display: none; overflow-x: auto; gap: 6px; margin-bottom: 12px; position: sticky; top: 66px; z-index: 10; background: var(--bg); padding: 8px 0; }
