@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuditModule } from "../audit/audit.module";
-import { AvailabilityController, VacationOperationsController } from "./availability.controller";
+import { AvailabilityController } from "./availability.controller";
+import { VacationOperationsController } from "./vacation-operations.controller";
 import { AvailabilityService } from "./availability.service";
 import { CalendarController } from "./calendar.controller";
 import { CalendarService } from "./calendar.service";
