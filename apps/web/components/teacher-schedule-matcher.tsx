@@ -56,9 +56,14 @@ export function TeacherScheduleMatcher({
     if (!subjectId || !effectiveFrom || !slots.length) return;
     setBusy(true); setError("");
     try {
+      const normalizedSlots = slots.map((slot) => ({
+        dayOfWeek: Number(slot.dayOfWeek),
+        startTime: String(slot.startTime).slice(0, 5),
+        durationMinutes: Number(slot.durationMinutes),
+      }));
       const result = await api<any>("/teachers/match-schedule", {
         method: "POST",
-        body: JSON.stringify({ subjectId, effectiveFrom, slots }),
+        body: JSON.stringify({ subjectId, effectiveFrom, slots: normalizedSlots }),
       });
       setData(result);
       const selected = result.results?.find((item: Match) => item.teacherId === selectedTeacherId && item.selectable);
