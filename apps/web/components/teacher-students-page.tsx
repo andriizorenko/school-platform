@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { PlatformShell } from "./platform-shell";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { useData } from "../lib/use-data";
-import { dateTime } from "../lib/format";
+import { dateTime, lessonCount } from "../lib/format";
 
 const dayLabels: Record<number, string> = { 1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Нд" };
 
@@ -66,7 +66,7 @@ export function TeacherStudentsPage() {
             <div className="muted">{scheduleText(enrollment.schedule)}</div>
             <div className="teacher-student-balance">
               <span>Залишилось</span>
-              <strong>{Number(enrollment.balanceLessonUnits ?? 0)} заняття</strong>
+              <strong>{lessonCount(enrollment.balanceLessonUnits)}</strong>
             </div>
           </div>)}
         </div>
