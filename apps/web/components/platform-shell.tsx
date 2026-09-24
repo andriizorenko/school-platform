@@ -21,7 +21,7 @@ const navByRole: Record<string, NavItem[]> = {
     { href: "/admin/team", label: "Команда" },
     { href: "/admin/courses", label: "Курси" },
     { href: "/admin/settings", label: "Налаштування" },
-    { href: "/admin/audit", label: "Audit log" },
+    { href: "/admin/audit", label: "Журнал аудиту" },
   ],
   SUPPORT_MANAGER: [
     { href: "/admin", label: "Огляд" },
@@ -70,6 +70,16 @@ const navByRole: Record<string, NavItem[]> = {
   ],
 };
 
+const roleLabel: Record<string, string> = {
+  ADMIN: "Адміністратор",
+  SUPPORT_MANAGER: "Менеджер підтримки",
+  MANAGER: "Менеджер",
+  FINANCIER: "Фінансист",
+  TEACHER: "Викладач",
+  PARENT: "Батьки",
+  STUDENT: "Учень",
+};
+
 function isActive(path:string, href:string){
   if(path===href) return true;
   if(["/admin","/manager","/teacher","/parent","/student","/financier"].includes(href)) return false;
@@ -115,7 +125,7 @@ export function PlatformShell({ children, allowedRoles }: { children: React.Reac
     </aside>
     <section className="content">
       <header className="topbar">
-        <div><strong>{primaryRole}</strong><span className="muted"> · {user.email}</span></div>
+        <div><strong>{roleLabel[primaryRole] ?? primaryRole}</strong><span className="muted"> · {user.email}</span></div>
         <div className="row topbar-actions"><Link href="/profile" className="btn secondary">Профіль</Link><button className="btn secondary" onClick={logout}>Вийти</button></div>
       </header>
       <main className="main">{children}</main>
