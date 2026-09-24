@@ -436,6 +436,9 @@ async function run() {
   const studentDashboard = await request("/student/dashboard", { cookie: student.cookie });
   expectStatus(studentDashboard, 200, "student dashboard");
   assert.ok(studentDashboard.payload?.enrollments?.length >= 1, "student fixture must expose an active enrollment");
+  const studentCourses = await request("/portal/courses", { cookie: student.cookie });
+  expectStatus(studentCourses, 200, "student course portal");
+  assert.ok(Array.isArray(studentCourses.payload), "student course portal must return an array");
   const studentAsParent = await request("/parent/dashboard", { cookie: student.cookie });
   expectStatus(studentAsParent, 403, "student cannot use parent dashboard");
   assert.equal(studentAsParent.payload?.error?.code, "PARENT_PORTAL_ONLY");
