@@ -17,11 +17,22 @@ export function CoursesPortalPage({ role }: { role: "PARENT" | "STUDENT" }) {
 
   async function load() {
     try {
-      const [myCourses, catalogRows] = await Promise.all([api<any[]>("/portal/courses"), api<any[]>("/courses")]);
-      setOwned(myCourses); setCatalog(catalogRows);
-      if (role === "PARENT") setFamily(await api<any>("/parent/dashboard"));
+      const myCourses = await api<any[]>("/portal/courses");
+      setOwned(myCourses);
+      if (role === "PARENT") {
+        const [catalogRows, familyData] = await Promise.all([
+          api<any[]>("/courses"),
+          api<any>("/parent/dashboard"),
+        ]);
+        setCatalog(catalogRows);
+        setFamily(familyData);
+      } else {
+        setCatalog([]);
+      }
       setError("");
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) {
+      setError(e.message ?? "Не вдалося завантажити курси");
+    }
   }
   useEffect(() => { void load(); }, []);
 
