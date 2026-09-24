@@ -704,6 +704,7 @@ export class CoursesService {
     const ids = await this.accessibleStudentIds(actor);
     if (ids === null) throw new ForbiddenException({ code: "PORTAL_ONLY", message: "Use a student or parent account" });
     if (!ids.length) return [];
+    const studentIds = sql.join(ids.map((id) => sql`${id}::uuid`), sql`, `);
     const result = await this.db.execute(sql`
       SELECT ce.id course_enrollment_id,ce.student_id,ce.license_id,st.first_name,st.last_name,
         c.id course_id,c.title,c.description,l.ends_at,l.explanations_enabled,l.status,
@@ -713,7 +714,7 @@ export class CoursesService {
       JOIN course_licenses l ON l.id=ce.license_id
       JOIN courses c ON c.id=l.course_id
       JOIN students st ON st.id=ce.student_id
-      WHERE ce.student_id=ANY(${ids}::uuid[]) AND l.status='ACTIVE' AND l.ends_at>now()
+      WHERE ce.student_id IN (${studentIds}) AND l.status='ACTIVE' AND l.ends_at>now()
       ORDER BY c.title,st.first_name
     `);
     return result.rows;
