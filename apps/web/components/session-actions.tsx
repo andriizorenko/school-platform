@@ -120,6 +120,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [incidentComment, setIncidentComment] = useState("");
+  const [rescheduleAfterNoShow, setRescheduleAfterNoShow] = useState(false);
   const [firstLessonAmount, setFirstLessonAmount] = useState("");
   const [firstLessonPaymentMethod, setFirstLessonPaymentMethod] = useState("BANK_TRANSFER");
   const [firstLessonPriceLoading, setFirstLessonPriceLoading] = useState(false);
@@ -185,6 +186,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
 
   function open(next: Action) {
     setError("");
+    if (next !== "reschedule") setRescheduleAfterNoShow(false);
     if (next === "reschedule") {
       setSlotDays(14);
       setSlotData(null);
@@ -296,10 +298,28 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
 
   async function submitIncident(event: FormEvent, kind: "student-no-show" | "teacher-late-cancellation") {
     event.preventDefault();
-    await finish(() => api(`/sessions/${detail.id}/incidents/${kind}`, {
-      method: "POST",
-      body: JSON.stringify({ comment: incidentComment.trim() || undefined }),
-    }));
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<any>(`/sessions/${detail.id}/incidents/${kind}`, {
+        method: "POST",
+        body: JSON.stringify({ comment: incidentComment.trim() || undefined }),
+      });
+
+      if (kind === "student-no-show" && result?.requiresReschedule) {
+        setRescheduleReason("STUDENT_CANNOT_ATTEND");
+        setRescheduleComment(incidentComment.trim() || "Відпрацювання після пропуску");
+        setRescheduleAfterNoShow(true);
+        setAction("reschedule");
+        return;
+      }
+
+      await onSuccess();
+    } catch (exception: any) {
+      setError(exception?.message ?? "Не вдалося виконати дію");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (action === "mark") {
@@ -355,8 +375,10 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       <form className="stack session-action-form" onSubmit={submitReschedule}>
         <div className="row action-form-head">
           <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
-          <strong>Перенести заняття</strong>
+          <strong>{rescheduleAfterNoShow ? "Домовитись про відпрацювання" : "Перенести заняття"}</strong>
         </div>
+
+        {rescheduleAfterNoShow && <div className="notice-card"><strong>Пропуск зафіксовано без списання.</strong><div className="muted" style={{marginTop:6}}>Якщо узгоджуєте відпрацювання, оберіть вільну годину викладача нижче або перенесіть заняття в кінець абонементу.</div></div>}
 
         <RescheduleReasonFields role={role} value={rescheduleReason} onChange={setRescheduleReason} />
 
@@ -382,8 +404,8 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
         <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
         {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
         {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : "Перенести на вибрану годину"}</button>
-        {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>Перенести в кінець абонементу</button>}
+        <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : rescheduleAfterNoShow ? "Відпрацювати у вибрану годину" : "Перенести на вибрану годину"}</button>
+        {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterNoShow ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
       </form>
     );
   }
