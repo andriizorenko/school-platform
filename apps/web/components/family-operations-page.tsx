@@ -35,6 +35,8 @@ export function FamilyOperationsPage({ familyId, role }: { familyId: string; rol
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState(false);
   const [archiveReason, setArchiveReason] = useState("");
+  const [addingChild, setAddingChild] = useState(false);
+  const [childForm, setChildForm] = useState({ firstName: "", lastName: "", gradeLevel: "" });
   const [parentForm, setParentForm] = useState({ firstName: "", lastName: "", phone: "", email: "" });
 
   async function load() {
@@ -68,6 +70,37 @@ export function FamilyOperationsPage({ familyId, role }: { familyId: string; rol
     try { await api(`/users/${userId}/invite`, { method: "POST" }); setMessage("Запрошення надіслано на email."); await load(); }
     catch (value: any) { setMessage(value.message ?? "Не вдалося надіслати запрошення"); }
     finally { setBusy(""); }
+  }
+
+  async function createChild(event: FormEvent) {
+    event.preventDefault(); setBusy("child"); setMessage("");
+    try {
+      const child = await api<any>(`/families/${familyId}/students`, {
+        method: "POST",
+        body: JSON.stringify({
+          firstName: childForm.firstName.trim(),
+          lastName: childForm.lastName.trim(),
+          gradeLevel: childForm.gradeLevel ? Number(childForm.gradeLevel) : undefined,
+        }),
+      });
+      if (role === "MANAGER") {
+        const current = await api<any>("/auth/me");
+        if (current?.user?.id) {
+          await api(`/students/${child.id}/primary-manager`, {
+            method: "POST",
+            body: JSON.stringify({ managerUserId: current.user.id }),
+          });
+        }
+      }
+      setChildForm({ firstName: "", lastName: "", gradeLevel: "" });
+      setAddingChild(false);
+      setMessage("Дитину додано до сімʼї.");
+      await load();
+    } catch (value: any) {
+      setMessage(value.message ?? "Не вдалося додати дитину");
+    } finally {
+      setBusy("");
+    }
   }
 
   async function archiveFamily() {
@@ -129,7 +162,10 @@ export function FamilyOperationsPage({ familyId, role }: { familyId: string; rol
       </div>
 
       <section className="stack">
-        <h2>Діти та навчання</h2>
+        <div className="page-head compact-page-head">
+          <h2>Діти та навчання</h2>
+          {!data.family.archivedAt && <button className="btn secondary" onClick={() => { setMessage(""); setAddingChild(true); }}>+ Додати дитину</button>}
+        </div>
         <div className="family-children-grid">{data.children.map((child:any) => <article className="card family-child-card" key={child.id}>
           <div className="page-head compact-page-head"><div><h3>{child.lastName} {child.firstName}</h3><div className="muted">{child.gradeLevel ? `${child.gradeLevel} клас` : "Клас не вказано"} · {child.archivedAt ? "архів" : child.userId ? "має учнівський акаунт" : "без окремого акаунта"}</div></div><Link className="btn secondary" href={studentHref(role,child.id)}>Відкрити учня</Link></div>
           <div className="row wrap-row"><span className="muted">Primary manager: <strong>{child.managerUserId ? `${child.managerLastName} ${child.managerFirstName}` : "не призначено"}</strong></span>{child.accountStatus && <span className="badge">{child.accountStatus}</span>}</div>
@@ -141,6 +177,19 @@ export function FamilyOperationsPage({ familyId, role }: { familyId: string; rol
       <section className="stack"><h2>Покупки сім’ї</h2><div className="table-wrap"><table><thead><tr><th>Дата</th><th>Що придбано</th><th>Сума</th><th>Метод</th><th>Статус</th></tr></thead><tbody>{data.purchases.map((item:any) => <tr key={item.id}><td>{dateTime(item.paidAt ?? item.createdAt)}</td><td>{purchaseTitle(item)}</td><td><strong>{money(item.totalMinor,item.currency)}</strong>{Number(item.discountMinor)>0 && <div className="muted">знижка {money(item.discountMinor,item.currency)}</div>}</td><td>{item.paymentMethod ?? item.source}</td><td><span className="badge">{item.status}</span></td></tr>)}</tbody></table></div>{!data.purchases.length && <div className="card muted">Покупок ще немає.</div>}</section>
 
       {!!data.courses.length && <section className="stack"><h2>Сімейні доступи до курсів</h2><div className="grid cols-2">{data.courses.map((course:any) => <div className="card" key={course.id}><div className="page-head compact-page-head"><div><strong>{course.courseTitle}</strong><div className="muted">до {dateTime(course.endsAt)}</div></div><span className="badge">{course.status}</span></div><div className="row wrap-row">{course.students?.map((student:any) => <span className="badge" key={student.studentId}>{student.lastName} {student.firstName}</span>)}</div></div>)}</div></section>}
+
+      {addingChild && <div className="sheet-backdrop" onClick={() => busy !== "child" && setAddingChild(false)}>
+        <aside className="sheet" onClick={(event) => event.stopPropagation()}>
+          <button className="sheet-close" onClick={() => busy !== "child" && setAddingChild(false)}>×</button>
+          <form className="stack management-sheet-body" style={{ marginTop: 40 }} onSubmit={createChild}>
+            <div><h2>Додати дитину до сімʼї</h2><p className="muted">Батьківський акаунт залишиться спільним. Предмети можна додати після створення дитини.</p></div>
+            <div className="field"><label>Імʼя *</label><input className="input" required value={childForm.firstName} onChange={(event) => setChildForm({ ...childForm, firstName: event.target.value })} /></div>
+            <div className="field"><label>Прізвище *</label><input className="input" required value={childForm.lastName} onChange={(event) => setChildForm({ ...childForm, lastName: event.target.value })} /></div>
+            <div className="field"><label>Клас</label><input className="input" type="number" min="1" max="12" value={childForm.gradeLevel} onChange={(event) => setChildForm({ ...childForm, gradeLevel: event.target.value })} /></div>
+            <button className="btn" disabled={busy === "child"}>{busy === "child" ? "Додаємо…" : "Додати дитину"}</button>
+          </form>
+        </aside>
+      </div>}
 
       <details className="card history-disclosure"><summary><strong>Останні значущі події сім’ї</strong><span className="muted">{data.activity.length}</span></summary><div className="history-body history-list">{data.activity.map((event:any) => <div className="history-list-row" key={event.id}><div className="row"><strong>{event.action}</strong><span className="badge">{event.entityType}</span></div><div className="muted">{dateTime(event.createdAt)} · {event.actorName}{event.actorRole ? ` · ${event.actorRole}` : ""}</div></div>)}</div></details>
     </div>}
