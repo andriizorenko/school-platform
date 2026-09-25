@@ -1,0 +1,96 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { api } from "../lib/api";
+import { PlatformShell } from "./platform-shell";
+import { SchoolCalendar } from "./calendar";
+
+function localDate(days = 0) {
+  const value = new Date();
+  value.setDate(value.getDate() + days);
+  const adjusted = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
+  return adjusted.toISOString().slice(0, 10);
+}
+
+export function FirstLessonsPage() {
+  const [students, setStudents] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [form, setForm] = useState({
+    studentId: "",
+    subjectId: "",
+    teacherId: "",
+    date: localDate(1),
+    time: "17:00",
+  });
+  const [calendarVersion, setCalendarVersion] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      api<any[]>("/ops/students?lifecycle=ACTIVE"),
+      api<any[]>("/subjects"),
+      api<any[]>("/teachers"),
+    ]).then(([studentRows, subjectRows, teacherRows]) => {
+      setStudents(studentRows);
+      setSubjects(subjectRows.filter((item: any) => item.status === "ACTIVE"));
+      setTeachers(teacherRows.filter((item: any) => item.teacherStatus === "ACTIVE" && !item.archivedAt));
+    }).catch((exception: any) => setError(exception?.message ?? "Не вдалося завантажити дані для першого уроку"));
+  }, []);
+
+  const teacherOptions = useMemo(() => teachers.filter((teacher: any) =>
+    !form.subjectId || (teacher.subjects ?? []).some((subject: any) => subject.id === form.subjectId && subject.isActive),
+  ), [teachers, form.subjectId]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const startsAt = new Date(`${form.date}T${form.time}:00`);
+      if (!Number.isFinite(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
+        setError("Оберіть майбутню дату й час.");
+        return;
+      }
+      await api("/first-lessons", {
+        method: "POST",
+        body: JSON.stringify({
+          studentId: form.studentId,
+          subjectId: form.subjectId,
+          teacherId: form.teacherId,
+          startsAt: startsAt.toISOString(),
+        }),
+      });
+      setMessage("Перший урок заплановано. Тепер зафіксуйте оплату до початку заняття.");
+      setCalendarVersion((value) => value + 1);
+    } catch (exception: any) {
+      setError(exception?.message ?? "Не вдалося запланувати перший урок");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <PlatformShell allowedRoles={["MANAGER"]}>
+    <div className="page-head">
+      <div><h1>Перші уроки</h1><p className="muted">Заплануйте перше заняття, зафіксуйте оплату до початку та проконтролюйте звіт викладача.</p></div>
+    </div>
+
+    <form className="card stack" onSubmit={submit} style={{ marginBottom: 16 }}>
+      <div className="page-head compact-page-head"><h2>Запланувати перший урок</h2><span className="badge">60 хв</span></div>
+      {error && <div className="error">{error}</div>}
+      {message && <div className="success">{message}</div>}
+      <div className="grid cols-2">
+        <div className="field"><label>Учень *</label><select className="select" required value={form.studentId} onChange={(event) => setForm({ ...form, studentId: event.target.value })}><option value="">Оберіть учня</option>{students.map((student: any) => <option key={student.id} value={student.id}>{student.last_name} {student.first_name}{student.grade_level ? ` · ${student.grade_level} клас` : ""}</option>)}</select></div>
+        <div className="field"><label>Предмет *</label><select className="select" required value={form.subjectId} onChange={(event) => setForm({ ...form, subjectId: event.target.value, teacherId: "" })}><option value="">Оберіть предмет</option>{subjects.map((subject: any) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></div>
+        <div className="field"><label>Викладач *</label><select className="select" required disabled={!form.subjectId} value={form.teacherId} onChange={(event) => setForm({ ...form, teacherId: event.target.value })}><option value="">Оберіть викладача</option>{teacherOptions.map((teacher: any) => <option key={teacher.userId} value={teacher.userId}>{teacher.lastName} {teacher.firstName}</option>)}</select></div>
+        <div className="field"><label>Дата *</label><input className="input" type="date" min={localDate()} required value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></div>
+        <div className="field"><label>Час *</label><input className="input" type="time" step="1800" required value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} /></div>
+      </div>
+      <p className="muted">Система перевірить предмет викладача, його доступність і конфлікти в календарі.</p>
+      <button className="btn" disabled={busy || !form.studentId || !form.subjectId || !form.teacherId}>{busy ? "Плануємо…" : "Запланувати перший урок"}</button>
+    </form>
+
+    <SchoolCalendar key={calendarVersion} role="MANAGER" query="sessionType=FIRST" />
+  </PlatformShell>;
+}
