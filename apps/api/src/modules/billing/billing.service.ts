@@ -185,7 +185,7 @@ export class BillingService {
         throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "First lesson not found" });
       }
 
-      const session = locked.rows[0] as {
+      const rawSession = locked.rows[0] as {
         id: string;
         student_id: string;
         subject_id: string;
@@ -193,7 +193,11 @@ export class BillingService {
         funding_status: string;
         status: string;
         family_id: string;
-        starts_at: Date;
+        starts_at: Date | string;
+      };
+      const session = {
+        ...rawSession,
+        starts_at: new Date(rawSession.starts_at),
       };
 
       if (session.session_type !== "FIRST") {
