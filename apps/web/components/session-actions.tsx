@@ -10,8 +10,10 @@ export type SessionActionRole = "ADMIN" | "MANAGER" | "TEACHER" | "PARENT" | "ST
 export type SessionActionDetail = {
   id: string;
   student: { id: string };
+  subject: { id: string };
   enrollmentId?: string | null;
   sessionType: "FIRST" | "REGULAR";
+  fundingStatus: "PAID" | "BOOKED";
   startsAt: string;
   capabilities: {
     canMark: boolean;
@@ -21,7 +23,7 @@ export type SessionActionDetail = {
   };
 };
 
-type Action = "mark" | "reschedule" | "substitute" | "student-no-show" | "teacher-late-cancellation" | null;
+type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "student-no-show" | "teacher-late-cancellation" | null;
 
 type FreeSlot = { startsAt: string; endsAt: string; date: string; time: string };
 type FreeSlotsResponse = {
@@ -118,6 +120,9 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [incidentComment, setIncidentComment] = useState("");
+  const [firstLessonAmount, setFirstLessonAmount] = useState("");
+  const [firstLessonPaymentMethod, setFirstLessonPaymentMethod] = useState("BANK_TRANSFER");
+  const [firstLessonPriceLoading, setFirstLessonPriceLoading] = useState(false);
   const [substitutesLoading, setSubstitutesLoading] = useState(false);
   const [substituteCandidates, setSubstituteCandidates] = useState<SubstituteCandidate[]>([]);
   const [selectedSubstitute, setSelectedSubstitute] = useState("");
@@ -150,6 +155,19 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       })
       .finally(() => setSlotsLoading(false));
   }, [action, detail.id, slotDays]);
+
+  useEffect(() => {
+    if (action !== "first-payment") return;
+    setFirstLessonPriceLoading(true);
+    setError("");
+    api<any>(`/subjects/${detail.subject.id}/prices/current`)
+      .then((price) => setFirstLessonAmount((Number(price.firstLessonPriceMinor ?? 0) / 100).toFixed(2)))
+      .catch((exception: any) => {
+        setFirstLessonAmount("");
+        setError(exception?.message ?? "Не вдалося завантажити ціну першого уроку");
+      })
+      .finally(() => setFirstLessonPriceLoading(false));
+  }, [action, detail.subject.id]);
 
   useEffect(() => {
     if (action !== "substitute") return;
@@ -215,6 +233,22 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       body: JSON.stringify({
         topicTitle: topicTitle.trim(),
         homeworkAssigned,
+      }),
+    }));
+  }
+
+  async function submitFirstPayment(event: FormEvent) {
+    event.preventDefault();
+    const amount = Number(firstLessonAmount.replace(",", "."));
+    if (!Number.isFinite(amount) || amount < 0) {
+      setError("Вкажіть коректну суму оплати.");
+      return;
+    }
+    await finish(() => api(`/sessions/${detail.id}/first-lesson/payment`, {
+      method: "POST",
+      body: JSON.stringify({
+        amountMinor: Math.round(amount * 100),
+        paymentMethod: firstLessonPaymentMethod,
       }),
     }));
   }
@@ -300,6 +334,22 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
     );
   }
 
+  if (action === "first-payment") {
+    return (
+      <form className="stack session-action-form" onSubmit={submitFirstPayment}>
+        <div className="row action-form-head">
+          <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
+          <strong>Оплата першого уроку</strong>
+        </div>
+        <p className="muted form-note">Оплату потрібно зафіксувати до запланованого початку першого уроку.</p>
+        <div className="field"><label>Отримано, ₴</label><input className="input" type="number" min="0" step="0.01" required disabled={firstLessonPriceLoading} value={firstLessonAmount} onChange={(event) => setFirstLessonAmount(event.target.value)} /></div>
+        <div className="field"><label>Спосіб оплати</label><select className="select" value={firstLessonPaymentMethod} onChange={(event) => setFirstLessonPaymentMethod(event.target.value)}><option value="BANK_TRANSFER">Переказ</option><option value="CARD">Картка</option><option value="CASH">Готівка</option><option value="OTHER">Інше</option></select></div>
+        {error && <div className="error">{error}</div>}
+        <button className="btn" disabled={busy || firstLessonPriceLoading || firstLessonAmount === ""}>{busy ? "Зберігаємо…" : "Зафіксувати оплату"}</button>
+      </form>
+    );
+  }
+
   if (action === "reschedule") {
     return (
       <form className="stack session-action-form" onSubmit={submitReschedule}>
@@ -377,6 +427,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
 
   return (
     <div className="stack session-actions">
+      {detail.sessionType === "FIRST" && detail.fundingStatus === "BOOKED" && (role === "MANAGER" || role === "ADMIN") && <button disabled={busy} className="btn" onClick={() => open("first-payment")}>Зафіксувати оплату</button>}
       {detail.capabilities.canMark && <button disabled={busy} className="btn" onClick={() => open("mark")}>Відмітити урок</button>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
