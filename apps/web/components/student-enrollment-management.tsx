@@ -125,8 +125,19 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
 
   async function saveSchedule(event: FormEvent) {
     event.preventDefault();
+    const normalizedSlots = scheduleSlots.map((slot) => ({
+      dayOfWeek: Number(slot.dayOfWeek),
+      startTime: String(slot.startTime).slice(0, 5),
+      durationMinutes: Number(slot.durationMinutes),
+    }));
     await run(
-      () => api(`/enrollments/${enrollment.id}/schedule`, { method: "PUT", body: JSON.stringify({ effectiveFrom: scheduleDate, slots: scheduleSlots }) }),
+      () => api(`/enrollments/${enrollment.id}/schedule`, {
+        method: "PUT",
+        body: JSON.stringify({
+          effectiveFrom: String(scheduleDate).slice(0, 10),
+          slots: normalizedSlots,
+        }),
+      }),
       "Новий регулярний графік заплановано.",
     );
   }
