@@ -2,6 +2,10 @@
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
 
+const errorMessages: Record<string, string> = {
+  INCIDENT_ALREADY_RECORDED_FOR_OCCURRENCE: "Для цього заняття подію вже зафіксовано. Спочатку перенесіть урок, а вже після нового запланованого часу можна фіксувати наступний інцидент.",
+};
+
 export class ApiError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string, public readonly details?: unknown) {
     super(message);
@@ -21,7 +25,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const error = payload?.error ?? payload ?? {};
-    throw new ApiError(response.status, error.code ?? "API_ERROR", error.message ?? "Помилка запиту", error.details);
+    const code = error.code ?? "API_ERROR";
+    throw new ApiError(response.status, code, errorMessages[code] ?? error.message ?? "Помилка запиту", error.details);
   }
   return payload as T;
 }
