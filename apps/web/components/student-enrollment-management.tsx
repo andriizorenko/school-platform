@@ -183,7 +183,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
       {enrollment.status === "ACTIVE" && <button className="btn secondary" onClick={() => open("schedule")}>Змінити графік</button>}
       {enrollment.status !== "INACTIVE" && <button className="btn secondary" onClick={() => open("teacher")}>{enrollment.primaryTeacher ? "Змінити викладача" : "Призначити викладача"}</button>}
       {enrollment.status === "ACTIVE" && <button className="btn secondary" onClick={() => open("freeze")}>Призупинити</button>}
-      {enrollment.status !== "INACTIVE" && <button className="btn secondary" disabled={transferable <= 0} onClick={() => open("transfer")}>Передати заняття</button>}
+      {enrollment.status !== "INACTIVE" && <button className="btn secondary" onClick={() => open("transfer")}>Передати заняття</button>}
       {enrollment.status !== "INACTIVE" && <button className="btn danger" onClick={() => open("writeoff")}>Завершити навчання</button>}
       {enrollment.status !== "ACTIVE" && <button className="btn" onClick={reactivate} disabled={busy}>Відновити навчання</button>}
     </div>
@@ -242,7 +242,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
             <div><h2>Передати заняття іншій дитині</h2><p className="muted">Можна переносити лише між дітьми цієї сімʼї в тому самому предметі. Компенсаційні кредити викладача не передаються.</p></div>
             <div className="card compact-card"><span className="muted">Доступно без активних резервів</span><strong>{transferable} заняття</strong></div>
             <div className="field"><label>Кому</label><select className="select" value={transfer.toEnrollmentId} onChange={(event) => setTransfer((value) => ({ ...value, toEnrollmentId: event.target.value }))} required><option value="">Оберіть дитину</option>{familyTargets.map((target) => <option key={target.id} value={target.id}>{target.student.lastName} {target.student.firstName} · {target.subject.name}</option>)}</select></div>
-            {!familyTargets.length && <div className="warning-note">У сімʼї немає іншої активної дитини з цим предметом.</div>}
+            {transferable <= 0 && <div className="warning-note">Усі доступні заняття зараз зарезервовані під майбутній графік. Щоб передати заняття іншій дитині, спочатку призупиніть навчання — резерви звільняться, а баланс залишиться доступним для передачі.</div>}{!familyTargets.length && <div className="warning-note">У сімʼї немає іншої активної дитини з цим предметом.</div>}
             <div className="field"><label>Кількість занять</label><input className="input" type="number" min="0.5" max={transferable || undefined} step="0.5" value={transfer.lessonUnits} onChange={(event) => setTransfer((value) => ({ ...value, lessonUnits: event.target.value }))} required /></div>
             <div className="field"><label>Коментар</label><textarea className="input" value={note} onChange={(event) => setNote(event.target.value)} /></div>
             <button className="btn" disabled={busy || !transfer.toEnrollmentId || !familyTargets.length}>Передати заняття</button>
