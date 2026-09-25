@@ -527,7 +527,15 @@ export class LessonPoliciesService {
       FOR UPDATE
     `);
     if (!locked.rowCount) throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
-    return locked.rows[0] as LockedSession;
+    const row = locked.rows[0] as Omit<LockedSession, "starts_at" | "ends_at"> & {
+      starts_at: Date | string;
+      ends_at: Date | string;
+    };
+    return {
+      ...row,
+      starts_at: new Date(row.starts_at),
+      ends_at: new Date(row.ends_at),
+    };
   }
 
   private assertRegularPaidSession(session: LockedSession) {
