@@ -25,7 +25,7 @@ function ledgerLabel(item: any) {
     TRANSFER_IN: "Перенесення від іншої дитини",
     MANUAL_ADJUSTMENT: "Ручне коригування",
     LESSON_COMPLETED: "Проведений урок",
-    NO_SHOW_CHARGED: "Списаний no-show",
+    NO_SHOW_CHARGED: "Списаний пропуск",
     TRANSFER_OUT: "Передано іншій дитині",
     WRITE_OFF: "Списання залишку",
   };
@@ -58,7 +58,7 @@ export function StudentOperationsHistory({ studentId }: { studentId: string }) {
     </div>
 
     <details className="card history-disclosure" open>
-      <summary><strong>Primary manager · історія</strong></summary>
+      <summary><strong>Основний менеджер · історія</strong></summary>
       <div className="table-wrap history-body">
         <table>
           <thead><tr><th>Менеджер</th><th>Початок</th><th>Завершення</th></tr></thead>
@@ -105,11 +105,11 @@ export function StudentOperationsHistory({ studentId }: { studentId: string }) {
         </div>
 
         <div>
-          <h3>Ledger балансу</h3>
+          <h3>Історія балансу</h3>
           <div className="table-wrap"><table><thead><tr><th>Дата</th><th>Операція</th><th>Зміна</th><th>Деталі</th></tr></thead><tbody>
             {enrollment.ledger?.map((item:any) => <tr key={`${item.direction}-${item.id}`}><td>{dateTime(item.createdAt)}</td><td>{ledgerLabel(item)}</td><td className={item.direction==="GRANT"?"positive-value":"negative-value"}>{item.direction==="GRANT"?"+":"−"}{lessonUnits(item.credits)} зан.</td><td>{item.restrictedTeacherId ? `Компенсація: ${item.restrictedTeacherLastName ?? ""} ${item.restrictedTeacherFirstName ?? ""}` : item.transferId ? "Пов’язано з перенесенням" : "—"}</td></tr>)}
           </tbody></table></div>
-          {!enrollment.ledger?.length && <div className="empty-inline">Ledger ще порожній.</div>}
+          {!enrollment.ledger?.length && <div className="empty-inline">Історія балансу ще порожня.</div>}
         </div>
 
         {!!enrollment.transfers?.length && <div>
