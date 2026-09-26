@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../lib/api";
 import { dateTime, money } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
@@ -71,7 +71,7 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
     setMsg("");
   }
 
-  async function refund(event: React.FormEvent) {
+  async function refund(event: FormEvent) {
     event.preventDefault();
     if (!refundPayment) return;
     const max = Number(refundPayment.refundable_lesson_units ?? 0);
