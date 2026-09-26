@@ -5,6 +5,19 @@ import { api } from "../lib/api";
 import { dateTime, money } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 
+function paymentStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    PAID: "Сплачено",
+    SUCCEEDED: "Успішно",
+    PENDING_PAYMENT: "Очікує оплату",
+    PARTIALLY_REFUNDED: "Частково повернено",
+    REFUNDED: "Повернено",
+    CANCELLED: "Скасовано",
+    FAILED: "Помилка",
+  };
+  return status ? (labels[status] ?? status) : "—";
+}
+
 export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
   const [rows, setRows] = useState<any[]>([]);
   const [reconciliation, setReconciliation] = useState<any[]>([]);
@@ -72,17 +85,17 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
   }
 
   return <PlatformShell allowedRoles={role === "ADMIN" ? ["ADMIN"] : ["MANAGER"]}>
-    <div className="page-head"><div><h1>Оплати</h1><p className="muted">Надходження сімей, статуси провайдера й повернення невикористаних занять.</p></div></div>
+    <div className="page-head finance-page-head"><div><h1>Оплати</h1><p className="muted">Надходження сімей, статуси провайдера й повернення невикористаних занять.</p></div></div>
     {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
     {msg && <div className="success" style={{ marginBottom: 12 }}>{msg}</div>}
     {loading ? <div className="card">Завантаження…</div> : rows.length === 0 ? <div className="card empty">Оплат за обраний період поки немає.</div> : <div className="table-wrap"><table><thead><tr><th>Дата</th><th>Сімʼя / учень</th><th>Предмет</th><th>Кількість</th><th>Сума</th><th>Метод</th><th>Статус</th><th></th></tr></thead><tbody>{rows.map((p) => {
       const refunded = Number(p.refunded_minor ?? 0);
       const refundable = Number(p.refundable_lesson_units ?? 0);
       const canRefund = ["LIQPAY", "MONO"].includes(p.provider) && ["PAID", "PARTIALLY_REFUNDED"].includes(p.status) && refundable >= 0.5;
-      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{p.method ?? "—"}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className="badge">{p.status}</span>{p.provider_status && <><br/><small className="muted">{p.provider_status}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => void refund(p)}>Повернення</button>}</td></tr>;
+      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{p.method ?? "—"}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className={`badge ${p.status === "PAID" ? "paid" : p.status === "PARTIALLY_REFUNDED" ? "booked" : ""}`}>{paymentStatusLabel(p.status)}</span>{p.provider_status && <><br/><small className="muted">{p.provider_status}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => void refund(p)}>Повернення</button>}</td></tr>;
     })}</tbody></table></div>}
-    {!loading && <div style={{ marginTop: 24 }}>
-      <div className="page-head"><div><h2>Звірка з платіжними провайдерами</h2><p className="muted">Події, що потребують ручної перевірки. Перед закриттям звірте платіж у банку, замовлення, повернення та баланс занять.</p></div><span className="badge">{reconciliation.length}</span></div>
+    {!loading && <div className="reconciliation-section">
+      <div className="page-head"><div><h2>Звірка з платіжними провайдерами</h2><p className="muted">Події, що потребують ручної перевірки. Перед закриттям звірте платіж у банку, замовлення, повернення та баланс занять.</p></div><span className={`badge ${reconciliation.length ? "booked" : "paid"}`}>{reconciliation.length}</span></div>
       {reconciliation.length === 0 ? <div className="card empty">Невирішених подій немає.</div> : <div className="table-wrap"><table><thead><tr><th>Отримано</th><th>Провайдер</th><th>Сімʼя / учень</th><th>Замовлення</th><th>Причина</th><th></th></tr></thead><tbody>{reconciliation.map((event) => <tr key={event.id}>
         <td>{dateTime(event.received_at)}</td>
         <td>{event.provider}<br/><small className="muted">{event.provider_status ?? "—"}</small></td>
