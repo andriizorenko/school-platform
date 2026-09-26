@@ -415,7 +415,11 @@ tr:last-child td { border-bottom: 0; }
 .pdf-page-viewer { display:grid; gap:14px; }
 .pdf-page { position:relative; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#e4e7ec; user-select:none; }
 .pdf-page img { display:block; width:100%; height:auto; pointer-events:none; }
-.pdf-watermark { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) rotate(-24deg); font-size:clamp(18px,4vw,46px); font-weight:800; color:rgba(16,24,40,.10); white-space:nowrap; pointer-events:none; }
+.pdf-watermark-layer { position:absolute; inset:0; z-index:2; pointer-events:none; overflow:hidden; }
+.pdf-watermark-layer span { position:absolute; left:50%; transform:translate(-50%,-50%) rotate(-24deg); font-size:clamp(20px,3.2vw,42px); font-weight:800; letter-spacing:.02em; color:rgba(31,47,97,.17); text-shadow:0 1px 0 rgba(255,255,255,.55); white-space:nowrap; user-select:none; }
+.pdf-watermark-layer span:nth-child(1) { top:24%; }
+.pdf-watermark-layer span:nth-child(2) { top:50%; }
+.pdf-watermark-layer span:nth-child(3) { top:76%; }
 .pdf-page-number { position:absolute; right:8px; bottom:8px; background:rgba(16,24,40,.72); color:white; border-radius:999px; padding:3px 7px; font-size:11px; }
 .course-explanation { white-space:pre-wrap; background:#f8fafc; padding:10px; border-radius:8px; }
 @media(max-width:1000px){ .course-builder-layout{grid-template-columns:1fr}.course-builder-help{position:static}.course-builder-module-head,.course-builder-lesson{align-items:stretch;flex-direction:column}.course-lesson-main{width:100%}.course-lesson-builder-sheet{width:100%} }
