@@ -782,7 +782,7 @@ export class CoursesService {
       WHERE b.lesson_id=${lessonId}
       ORDER BY b.position
     `);
-    return { lesson: lesson.rows[0], blocks: blocks.rows };
+    return { enrollment, lesson: lesson.rows[0], blocks: blocks.rows };
   }
 
   async completeLesson(enrollmentId: string, lessonId: string, actor: AuthUser) {
