@@ -1293,3 +1293,39 @@ th { background: rgba(247,249,255,.74); }
   .refund-sheet-actions { flex-direction:column-reverse; }
   .refund-sheet-actions .btn { width:100%; }
 }
+
+
+/* Reconciliation workflow */
+.reconciliation-sheet {
+  width:min(540px,100%);
+  border-left:1px solid rgba(255,255,255,.9);
+  background:
+    radial-gradient(circle at 20% 0%,rgba(104,122,241,.10),transparent 32%),
+    linear-gradient(160deg,rgba(255,255,255,.96),rgba(247,249,255,.92));
+  box-shadow:-26px 0 70px rgba(38,49,96,.16);
+  backdrop-filter:blur(24px) saturate(125%);
+}
+.reconciliation-summary {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.reconciliation-summary > div {
+  display:grid;
+  gap:4px;
+  min-height:88px;
+  padding:13px 14px;
+  border:1px solid rgba(111,126,185,.14);
+  border-radius:14px;
+  background:rgba(255,255,255,.68);
+  box-shadow:0 7px 20px rgba(53,72,136,.035);
+}
+.reconciliation-summary span { font-size:12px; }
+.reconciliation-summary strong { font-size:14px; line-height:1.35; }
+.reconciliation-summary small { color:var(--muted); overflow-wrap:anywhere; }
+.reconciliation-note-input { min-height:118px; resize:vertical; }
+.reconciliation-reason { white-space:normal; line-height:1.35; }
+@media(max-width:700px) {
+  .reconciliation-summary { grid-template-columns:1fr; }
+}
