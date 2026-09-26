@@ -35,7 +35,7 @@ function localDateParam() {
 function startsAt(event: TodayEvent) { return event.startsAt ?? event.starts_at ?? ""; }
 function endsAt(event: TodayEvent) { return event.endsAt ?? event.ends_at ?? ""; }
 function studentName(event: TodayEvent) {
-  return event.student?.fullName ?? [event.studentLastName ?? event.student_last_name, event.studentFirstName ?? event.student_first_name].filter(Boolean).join(" ") || "Учень";
+  return event.student?.fullName ?? ([event.studentLastName ?? event.student_last_name, event.studentFirstName ?? event.student_first_name].filter(Boolean).join(" ") || "Учень");
 }
 function subjectName(event: TodayEvent) { return event.subject?.name ?? event.subjectName ?? event.subject_name ?? "Предмет"; }
 function funding(event: TodayEvent) { return event.fundingStatus ?? event.funding_status ?? "BOOKED"; }
