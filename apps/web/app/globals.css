@@ -1123,3 +1123,87 @@ th { background: rgba(247,249,255,.74); }
     border-radius:22px 22px 0 0;
   }
 }
+
+
+/* Glass course catalog + purchase flow */
+.courses-portal-head { margin-bottom: 18px; }
+.courses-portal-section { gap: 14px; }
+.courses-catalog-section { margin-top: 26px; }
+.section-heading {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+}
+.courses-grid { align-items:stretch; }
+.course-owned-card,
+.course-catalog-card,
+.courses-empty {
+  border-color: rgba(255,255,255,.88);
+  background: linear-gradient(145deg,rgba(255,255,255,.80),rgba(247,249,255,.67));
+  box-shadow: 0 14px 34px rgba(53,72,136,.05), inset 0 1px 0 rgba(255,255,255,.8);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+.course-owned-card {
+  position:relative;
+  overflow:hidden;
+}
+.course-owned-card::before {
+  content:"";
+  position:absolute;
+  inset:0 auto 0 0;
+  width:3px;
+  background:linear-gradient(180deg,#5369ea,#7f8cf2);
+  opacity:.75;
+}
+.course-owned-card > a { display:block; }
+.course-catalog-card {
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  min-height:210px;
+  gap:20px;
+}
+.course-card-kicker {
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(74,99,231,.08);
+  color:var(--accent);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.course-catalog-card h2 { margin:12px 0 8px; letter-spacing:-.02em; }
+.course-card-footer { justify-content:space-between; align-items:center; }
+.course-owned-card .progress,
+.course-catalog-card .progress {
+  background:rgba(109,124,177,.12);
+}
+.course-owned-card .progress span,
+.course-catalog-card .progress span {
+  background:linear-gradient(90deg,#5268ea,#7c89ef);
+}
+.course-purchase-sheet {
+  border-left: 1px solid rgba(255,255,255,.9);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(104,122,241,.08), transparent 32%),
+    linear-gradient(160deg,rgba(255,255,255,.95),rgba(247,249,255,.91));
+  box-shadow:-24px 0 60px rgba(38,49,96,.14);
+  backdrop-filter:blur(22px) saturate(125%);
+}
+.course-purchase-sheet .lesson-row {
+  border-color:rgba(111,126,185,.14);
+  background:rgba(255,255,255,.72);
+}
+.course-purchase-sheet .compact-card {
+  border-color:rgba(74,99,231,.16);
+  background:linear-gradient(145deg,rgba(245,248,255,.95),rgba(235,240,255,.82));
+}
+@media(max-width:760px) {
+  .course-card-footer { align-items:stretch; flex-direction:column; }
+  .course-card-footer .btn { width:100%; }
+}
