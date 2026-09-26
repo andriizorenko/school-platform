@@ -25,6 +25,9 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
+  const [refundPayment, setRefundPayment] = useState<any | null>(null);
+  const [refundUnits, setRefundUnits] = useState("1");
+  const [refundReason, setRefundReason] = useState("Повернення невикористаних занять");
 
   async function load() {
     setLoading(true); setError("");
@@ -59,23 +62,32 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
     }
   }
 
-  async function refund(payment: any) {
+  function openRefund(payment: any) {
     const max = Number(payment.refundable_lesson_units ?? 0);
-    const raw = window.prompt(`Скільки занять повернути? Доступно: ${max}. Крок: 0.5`, String(Math.min(1, max)));
-    if (raw == null) return;
-    const lessonUnits = Number(raw.replace(",", "."));
+    setRefundPayment(payment);
+    setRefundUnits(String(Math.min(1, max)));
+    setRefundReason("Повернення невикористаних занять");
+    setError("");
+    setMsg("");
+  }
+
+  async function refund(event: React.FormEvent) {
+    event.preventDefault();
+    if (!refundPayment) return;
+    const max = Number(refundPayment.refundable_lesson_units ?? 0);
+    const lessonUnits = Number(refundUnits.replace(",", "."));
     if (!Number.isFinite(lessonUnits) || lessonUnits <= 0 || lessonUnits > max || !Number.isInteger(lessonUnits * 2)) {
       setError(`Вкажіть значення від 0.5 до ${max} з кроком 0.5.`);
       return;
     }
-    const reason = window.prompt("Причина повернення (необовʼязково)", "Повернення невикористаних занять") ?? undefined;
     setBusy(true); setError(""); setMsg("");
     try {
-      await api(`/billing/orders/${payment.id}/refunds`, {
+      await api(`/billing/orders/${refundPayment.id}/refunds`, {
         method: "POST",
-        body: JSON.stringify({ lessonUnits, reason: reason || undefined, idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ lessonUnits, reason: refundReason.trim() || undefined, idempotencyKey: crypto.randomUUID() }),
       });
-      setMsg(`Повернення ${lessonUnits} занять оброблено.`);
+      setMsg(`Повернення ${lessonUnits} занять передано на обробку.`);
+      setRefundPayment(null);
       await load();
     } catch (e: any) {
       setError(e.message);
@@ -92,8 +104,45 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
       const refunded = Number(p.refunded_minor ?? 0);
       const refundable = Number(p.refundable_lesson_units ?? 0);
       const canRefund = ["LIQPAY", "MONO"].includes(p.provider) && ["PAID", "PARTIALLY_REFUNDED"].includes(p.status) && refundable >= 0.5;
-      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{p.method ?? "—"}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className={`badge ${p.status === "PAID" ? "paid" : p.status === "PARTIALLY_REFUNDED" ? "booked" : ""}`}>{paymentStatusLabel(p.status)}</span>{p.provider_status && <><br/><small className="muted">{p.provider_status}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => void refund(p)}>Повернення</button>}</td></tr>;
+      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{p.method ?? "—"}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className={`badge ${p.status === "PAID" ? "paid" : p.status === "PARTIALLY_REFUNDED" ? "booked" : ""}`}>{paymentStatusLabel(p.status)}</span>{p.provider_status && <><br/><small className="muted">{p.provider_status}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => openRefund(p)}>Повернення</button>}</td></tr>;
     })}</tbody></table></div>}
+    {refundPayment && <div className="sheet-backdrop" onClick={() => !busy && setRefundPayment(null)}>
+      <aside className="sheet refund-sheet" onClick={(event) => event.stopPropagation()}>
+        <button className="sheet-close" type="button" aria-label="Закрити" disabled={busy} onClick={() => setRefundPayment(null)}>×</button>
+        <div className="refund-sheet-head">
+          <span className="refund-sheet-kicker">Фінансова операція</span>
+          <h2>Повернення коштів</h2>
+          <p className="muted">Повернути можна лише невикористані заняття з цієї онлайн-покупки.</p>
+        </div>
+
+        <div className="refund-payment-summary">
+          <div><span className="muted">Сімʼя / учень</span><strong>{refundPayment.parent_last_name} {refundPayment.parent_first_name}</strong><small>{refundPayment.student_last_name} {refundPayment.student_first_name}</small></div>
+          <div><span className="muted">Предмет</span><strong>{refundPayment.subject_name ?? "—"}</strong></div>
+          <div><span className="muted">Оплачено</span><strong>{money(refundPayment.total_minor, refundPayment.currency)}</strong></div>
+          <div><span className="muted">Доступно до повернення</span><strong>{Number(refundPayment.refundable_lesson_units ?? 0)} зан.</strong></div>
+        </div>
+
+        <form className="stack refund-form" onSubmit={refund}>
+          <div className="field">
+            <label htmlFor="refund-units">Кількість занять</label>
+            <input id="refund-units" className="input" inputMode="decimal" value={refundUnits} onChange={(event) => setRefundUnits(event.target.value)} disabled={busy} />
+            <span className="field-hint">Крок 0.5 · максимум {Number(refundPayment.refundable_lesson_units ?? 0)}</span>
+          </div>
+          <div className="field">
+            <label htmlFor="refund-reason">Причина повернення</label>
+            <textarea id="refund-reason" className="input refund-reason-input" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} disabled={busy} />
+          </div>
+          <div className="refund-warning">
+            Після підтвердження платіжним провайдером відповідна кількість невикористаних занять буде списана з балансу. Для Monobank повернення може спочатку мати статус «в обробці».
+          </div>
+          <div className="refund-sheet-actions">
+            <button className="btn secondary" type="button" disabled={busy} onClick={() => setRefundPayment(null)}>Скасувати</button>
+            <button className="btn danger" type="submit" disabled={busy}>{busy ? "Обробляємо…" : "Повернути кошти"}</button>
+          </div>
+        </form>
+      </aside>
+    </div>}
+
     {!loading && <div className="reconciliation-section">
       <div className="page-head"><div><h2>Звірка з платіжними провайдерами</h2><p className="muted">Події, що потребують ручної перевірки. Перед закриттям звірте платіж у банку, замовлення, повернення та баланс занять.</p></div><span className={`badge ${reconciliation.length ? "booked" : "paid"}`}>{reconciliation.length}</span></div>
       {reconciliation.length === 0 ? <div className="card empty">Невирішених подій немає.</div> : <div className="table-wrap"><table><thead><tr><th>Отримано</th><th>Провайдер</th><th>Сімʼя / учень</th><th>Замовлення</th><th>Причина</th><th></th></tr></thead><tbody>{reconciliation.map((event) => <tr key={event.id}>
