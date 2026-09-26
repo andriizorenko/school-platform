@@ -35,7 +35,7 @@ function PdfViewer({ block, watermark }: { block: any; watermark: string }) {
   if (block.asset_status === "PROCESSING") return <div className="warning-note">Матеріал ще обробляється. Спробуйте оновити урок через кілька секунд.</div>;
   if (block.asset_status === "FAILED") return <div className="error">Не вдалося підготувати PDF для перегляду. Повідомте адміністратора.</div>;
   if (!pages.length) return <div className="muted">Сторінки PDF ще не готові.</div>;
-  return <div className="pdf-page-viewer"><div className="muted">{pages.length} стор. · матеріал відкривається лише всередині платформи</div>{pages.map((page: any) => <div className="pdf-page" key={page.assetId}><img src={`${API_URL}/files/${page.assetId}/content`} alt={`Сторінка ${page.pageNumber}`} draggable={false} /><div className="pdf-watermark">{watermark}</div><span className="pdf-page-number">{page.pageNumber}</span></div>)}</div>;
+  return <div className="pdf-page-viewer"><div className="muted">{pages.length} стор. · матеріал відкривається лише всередині платформи</div>{pages.map((page: any) => <div className="pdf-page" key={page.assetId}><img src={`${API_URL}/files/${page.assetId}/content`} alt={`Сторінка ${page.pageNumber}`} draggable={false} /><div className="pdf-watermark-layer" aria-hidden="true"><span>{watermark}</span><span>{watermark}</span><span>{watermark}</span></div><span className="pdf-page-number">{page.pageNumber}</span></div>)}</div>;
 }
 
 function TestSheet({ test, answers, setAnswers, result, onFinish, onClose, onTutorRequest }: any) {
