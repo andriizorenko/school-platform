@@ -181,7 +181,7 @@ export function PlatformShell({ children, allowedRoles }: { children: React.Reac
         <div className="row topbar-actions">
           <Link href="/profile" className="profile-chip" aria-label="Відкрити профіль">
             <span className="profile-avatar">{avatar}</span>
-            <span className="profile-copy"><strong>{roleLabel[primaryRole] ?? primaryRole}</strong><small>{user.email}</small></span>
+            <span className="profile-copy"><strong>Профіль</strong><small>{user.email}</small></span>
           </Link>
           <button className="icon-button" onClick={logout} title="Вийти" aria-label="Вийти">
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M13 3h5a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-5"/></svg>
