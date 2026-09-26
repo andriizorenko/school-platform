@@ -120,13 +120,23 @@ Changing a customer price never rewrites old purchases. Changing a teacher rate 
 
 ## Local setup
 
+PDF course processing requires Poppler's `pdftoppm` binary on the machine that runs `@school/worker`. The production worker image installs `poppler-utils`; for local development, install Poppler for your OS and ensure `pdftoppm` is available on `PATH` before starting the worker.
+
+Verify:
+
+```bash
+pdftoppm -v
+```
+
+Then start the platform:
+
 ```bash
 cp .env.example .env
 docker compose up -d postgres redis
 pnpm install
 pnpm db:migrate
 pnpm db:seed
-pnpm dev:api
+pnpm dev
 ```
 
 Health check:
