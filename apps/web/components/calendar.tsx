@@ -172,22 +172,32 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     <div className="event-title">{studentName(e)}</div><div className="muted" style={{fontSize:12}}>{subjectName(e)}{teacherLabel(e)}</div>
   </button>;
 
+  const compactLessonLabel = (e: CalendarEvent) => lifecycleStatus(e)==="CHARGED_NO_SHOW" ? "ПРОПУСК" : sessionType(e)==="FIRST" ? "Перший" : "Регулярний";
+  const compactLessonClass = (e: CalendarEvent) => lifecycleStatus(e)==="CHARGED_NO_SHOW" ? "danger" : sessionType(e)==="FIRST" ? "first" : "regular";
   const compactCard = (e: CalendarEvent) => <button
     key={e.id}
-    className={`event compact-week-event ${eventClass(e)}`}
+    className={`event compact-week-event ${eventClass(e)} ${sessionType(e)==="FIRST" ? "first-lesson" : ""}`}
     onClick={()=>setSelected(e)}
-    aria-label={`${timeOnly(eventStart(e))}–${timeOnly(eventEnd(e))}, ${studentName(e)}, ${subjectName(e)}`}
+    aria-label={`${timeOnly(eventStart(e))}–${timeOnly(eventEnd(e))}, ${studentName(e)}, ${subjectName(e)}, ${compactLessonLabel(e)}`}
   >
     <div className="compact-event-top">
-      <strong>{timeOnly(eventStart(e))}</strong>
-      <span className={`compact-payment-dot ${funding(e).toLowerCase()}`} title={funding(e)==="PAID"?"Сплачено":"Бронь"} />
-      {sessionType(e)==="FIRST"&&<span className="compact-event-chip first">1-й</span>}
-      {(e.needsReport??e.needs_report)&&<span className="compact-event-chip report">ЗВІТ</span>}
-      {lifecycleStatus(e)==="CHARGED_NO_SHOW"&&<span className="compact-event-chip danger">ПРОПУСК</span>}
-      {lifecycleStatus(e)==="CANCELLED"&&<span className="compact-event-chip muted">СКАС.</span>}
+      <strong>{timeOnly(eventStart(e))}-{timeOnly(eventEnd(e))}</strong>
+      <div className="compact-event-meta">
+        <span className={`compact-payment-dot ${funding(e).toLowerCase()}`} title={funding(e)==="PAID"?"Сплачено":"Бронь"} aria-label={funding(e)==="PAID"?"Сплачено":"Бронь"} />
+        <span className={`compact-event-chip ${compactLessonClass(e)}`}>{compactLessonLabel(e)}</span>
+      </div>
     </div>
     <div className="compact-event-student">{studentName(e)}</div>
-    <div className="compact-event-subject">{subjectName(e)}{teacherLabel(e)}</div>
+    <div className="compact-event-bottom">
+      <div className="compact-event-subject">{subjectName(e)}{teacherLabel(e)}</div>
+      <div className="compact-event-indicators">
+        {(e.needsReport??e.needs_report)&&<span className="compact-event-chip report">ЗВІТ</span>}
+        {lifecycleStatus(e)==="COMPLETED"&&<span className="compact-completed-icon" title="Урок проведено" aria-label="Урок проведено">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="m6.5 10 2.2 2.2 4.8-5"/></svg>
+        </span>}
+        {lifecycleStatus(e)==="CANCELLED"&&<span className="compact-event-chip muted">СКАС.</span>}
+      </div>
+    </div>
   </button>;
 
   function updateFilter(key: keyof CalendarFilters, value: string) {
