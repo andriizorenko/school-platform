@@ -1211,3 +1211,83 @@ th { background: rgba(247,249,255,.74); }
   .course-card-footer { align-items:stretch; flex-direction:column; }
   .course-card-footer .btn { width:100%; }
 }
+
+
+/* Guided refund workflow */
+.refund-sheet {
+  width:min(520px,100%);
+  border-left:1px solid rgba(255,255,255,.9);
+  background:
+    radial-gradient(circle at 20% 0%,rgba(104,122,241,.10),transparent 32%),
+    linear-gradient(160deg,rgba(255,255,255,.96),rgba(247,249,255,.92));
+  box-shadow:-26px 0 70px rgba(38,49,96,.16);
+  backdrop-filter:blur(24px) saturate(125%);
+}
+.refund-sheet-head {
+  display:grid;
+  gap:7px;
+  margin:8px 0 20px;
+  padding-right:42px;
+}
+.refund-sheet-head h2 { margin:0; font-size:25px; letter-spacing:-.025em; }
+.refund-sheet-kicker {
+  color:var(--accent);
+  font-size:11px;
+  font-weight:850;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+}
+.refund-payment-summary {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:20px;
+}
+.refund-payment-summary > div {
+  display:grid;
+  gap:4px;
+  min-height:82px;
+  padding:13px 14px;
+  border:1px solid rgba(111,126,185,.14);
+  border-radius:14px;
+  background:rgba(255,255,255,.68);
+  box-shadow:0 7px 20px rgba(53,72,136,.035);
+}
+.refund-payment-summary span { font-size:12px; }
+.refund-payment-summary strong { font-size:15px; }
+.refund-payment-summary small { color:var(--muted); }
+.refund-form { gap:16px; }
+.refund-reason-input { min-height:96px; resize:vertical; }
+.refund-warning {
+  padding:12px 14px;
+  border:1px solid rgba(217,119,6,.20);
+  border-radius:13px;
+  background:rgba(255,247,237,.78);
+  color:#92400e;
+  font-size:13px;
+  line-height:1.5;
+}
+.refund-sheet-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  padding-top:4px;
+}
+.refund-sheet .sheet-close {
+  float:none;
+  position:sticky;
+  top:0;
+  z-index:3;
+  margin-left:auto;
+  display:grid;
+  place-items:center;
+  background:rgba(255,255,255,.78);
+  border:1px solid rgba(111,126,185,.12);
+  box-shadow:0 8px 20px rgba(53,72,136,.06);
+  backdrop-filter:blur(12px);
+}
+@media(max-width:700px) {
+  .refund-payment-summary { grid-template-columns:1fr; }
+  .refund-sheet-actions { flex-direction:column-reverse; }
+  .refund-sheet-actions .btn { width:100%; }
+}
