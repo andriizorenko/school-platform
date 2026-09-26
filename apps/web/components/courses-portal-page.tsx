@@ -39,16 +39,25 @@ export function CoursesPortalPage({ role }: { role: "PARENT" | "STUDENT" }) {
   return <PlatformShell allowedRoles={[role]}>
     <div className="page-head courses-portal-head"><div><h1>Курси</h1><p className="muted">Самостійні курси, прогрес, тести та персональний банк помилок.</p></div></div>
     {error && <div className="error">{error}</div>}{message && <div className="success">{message}</div>}
-    <section className="stack courses-portal-section"><div className="section-heading"><h2>Мої курси</h2><span className="muted">{owned.length ? `${owned.length} активн.` : ""}</span></div>
-    <div className="grid cols-3 courses-grid">{owned.map(course => <div className="card course-card course-owned-card" key={course.course_enrollment_id}>
-      <Link href={`/${role.toLowerCase()}/courses/${course.course_enrollment_id}`}>
-        <span className="badge">до {dateOnly(course.ends_at)}</span><h2 style={{ marginTop: 10 }}>{course.title}</h2>{role === "PARENT" && <div className="muted">{course.last_name} {course.first_name}</div>}
-        <div className="progress"><span style={{ width: `${course.lesson_count ? Math.round(course.completed_count / course.lesson_count * 100) : 0}%` }} /></div><div className="muted">{course.completed_count}/{course.lesson_count} уроків</div>
-      </Link>
-      {role === "PARENT" && <button className="btn secondary" style={{ marginTop: 12 }} onClick={() => setManageLicenseId(course.license_id)}>Доступ дітей</button>}
-    </div>)}{!owned.length && <div className="card muted">Активних курсів ще немає.</div>}</div>
+    <section className="stack courses-portal-section">
+      <div className="section-heading"><h2>Мої курси</h2><span className="muted">{owned.length ? `${owned.length} активн.` : ""}</span></div>
+      <div className="grid cols-3 courses-grid">{owned.map(course => <div className="card course-card course-owned-card" key={course.course_enrollment_id}>
+        <Link href={`/${role.toLowerCase()}/courses/${course.course_enrollment_id}`}>
+          <span className="badge">до {dateOnly(course.ends_at)}</span><h2 style={{ marginTop: 10 }}>{course.title}</h2>{role === "PARENT" && <div className="muted">{course.last_name} {course.first_name}</div>}
+          <div className="progress"><span style={{ width: `${course.lesson_count ? Math.round(course.completed_count / course.lesson_count * 100) : 0}%` }} /></div><div className="muted">{course.completed_count}/{course.lesson_count} уроків</div>
+        </Link>
+        {role === "PARENT" && <button className="btn secondary" style={{ marginTop: 12 }} onClick={() => setManageLicenseId(course.license_id)}>Доступ дітей</button>}
+      </div>)}{!owned.length && <div className="card muted courses-empty">Активних курсів ще немає.</div>}</div>
+    </section>
 
-    {role === "PARENT" && <><h2 style={{ marginTop: 24 }}>Каталог</h2><div className="grid cols-3">{catalog.map(course => <div className="card" key={course.id}><h2>{course.title}</h2><p className="muted">{course.description}</p><div className="row" style={{ justifyContent: "space-between", marginTop: 14 }}><strong>{course.from_price_minor != null ? `від ${money(course.from_price_minor)}` : ""}</strong><button className="btn" onClick={() => setPurchaseCourseId(course.id)}>Обрати доступ</button></div></div>)}</div></>}
+    {role === "PARENT" && <section className="stack courses-portal-section courses-catalog-section">
+      <div className="section-heading"><h2>Каталог</h2><span className="muted">{catalog.length ? `${catalog.length} курсів` : ""}</span></div>
+      <div className="grid cols-3 courses-grid">{catalog.map(course => <div className="card course-catalog-card" key={course.id}>
+        <div><span className="course-card-kicker">Самостійний курс</span><h2>{course.title}</h2><p className="muted">{course.description}</p></div>
+        <div className="row course-card-footer"><strong>{course.from_price_minor != null ? `від ${money(course.from_price_minor)}` : "Ціну не вказано"}</strong><button className="btn" onClick={() => setPurchaseCourseId(course.id)}>Обрати доступ</button></div>
+      </div>)}</div>
+      {!catalog.length && <div className="card empty courses-empty">Опублікованих курсів поки немає.</div>}
+    </section>}
 
     {purchaseCourseId && family && <PurchaseCourseSheet courseId={purchaseCourseId} students={family.students ?? []} onClose={() => setPurchaseCourseId(null)} onDone={() => { setPurchaseCourseId(null); setMessage("Доступ до курсу надано"); void load(); }} onError={setError} />}
     {manageLicenseId && <LicenseAccessSheet licenseId={manageLicenseId} onClose={() => setManageLicenseId(null)} onChanged={() => { setMessage("Доступ дитини оновлено"); void load(); }} onError={setError} />}
