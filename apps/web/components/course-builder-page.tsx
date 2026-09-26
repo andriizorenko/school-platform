@@ -11,6 +11,30 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api")
 
 type Detail = { course: any; modules: any[]; plans: any[] };
 
+function courseStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    DRAFT: "Чернетка",
+    PUBLISHED: "Опубліковано",
+    ARCHIVED: "Архівовано",
+  };
+  return labels[status] ?? status;
+}
+
+function blockTypeLabel(type: string) {
+  const labels: Record<string, string> = { TEXT: "Текст", PDF: "PDF", TEST: "Тест" };
+  return labels[type] ?? type;
+}
+
+function assetStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    READY: "Готово",
+    PROCESSING: "Обробляється",
+    FAILED: "Помилка",
+    UPLOADED: "Завантажено",
+  };
+  return labels[status] ?? status;
+}
+
 function move<T>(items: T[], from: number, to: number) {
   const next = [...items];
   const [item] = next.splice(from, 1);
@@ -31,6 +55,7 @@ export function CourseBuilderPage({ courseId }: { courseId: string }) {
   const [showPlan, setShowPlan] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [coverFileName, setCoverFileName] = useState("");
   const [dragModuleId, setDragModuleId] = useState<string | null>(null);
   const [dragLesson, setDragLesson] = useState<{ moduleId: string; lessonId: string } | null>(null);
 
@@ -94,24 +119,24 @@ export function CourseBuilderPage({ courseId }: { courseId: string }) {
   if (!detail) return <PlatformShell allowedRoles={["ADMIN"]}><div className="card">Завантаження конструктора…</div>{error && <div className="error">{error}</div>}</PlatformShell>;
 
   return <PlatformShell allowedRoles={["ADMIN"]}>
-    <div className="page-head"><div><div className="muted"><Link href="/admin/courses">Курси</Link> / Конструктор</div><h1>{detail.course.title}</h1><p className="muted">Модулі, уроки, матеріали, тести та плани доступу.</p></div><div className="row">{detail.course.status !== "PUBLISHED" && <button className="btn" onClick={publish}>Опублікувати курс</button>}<button className="btn secondary" onClick={archive}>Архівувати</button></div></div>
+    <div className="page-head course-builder-page-head"><div><div className="muted"><Link href="/admin/courses">Курси</Link> / Конструктор</div><h1>{detail.course.title}</h1><p className="muted">Модулі, уроки, матеріали, тести та плани доступу.</p></div><div className="row">{detail.course.status !== "PUBLISHED" && <button className="btn" onClick={publish}>Опублікувати курс</button>}<button className="btn secondary" onClick={archive}>Архівувати</button></div></div>
     {error && <div className="error">{error}</div>}{message && <div className="success">{message}</div>}
 
     <div className="course-builder-layout">
       <div className="stack">
-        <form className="card" onSubmit={saveCourse}>
-          <div className="row" style={{ justifyContent: "space-between" }}><h2>Налаштування курсу</h2><span className="badge">{detail.course.status}</span></div>
+        <form className="card course-builder-card course-settings-card" onSubmit={saveCourse}>
+          <div className="row" style={{ justifyContent: "space-between" }}><h2>Налаштування курсу</h2><span className="badge">{courseStatusLabel(detail.course.status)}</span></div>
           <div className="grid cols-2">
             <div className="field"><label>Назва</label><input className="input" name="title" defaultValue={detail.course.title} required /></div>
-            <div className="field"><label>Slug</label><input className="input" name="slug" defaultValue={detail.course.slug} required /></div>
+            <div className="field"><label>Адреса курсу</label><input className="input" name="slug" defaultValue={detail.course.slug} required /><span className="field-hint">Використовується в URL курсу.</span></div>
             <div className="field"><label>Предмет</label><select className="select" name="subjectId" defaultValue={detail.course.subject_id ?? ""}><option value="">Без предмета</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-            <div className="field"><label>Обкладинка</label><input className="input" type="file" accept="image/*" onChange={e => void uploadCover(e.target.files?.[0])} /></div>
+            <div className="field"><label>Обкладинка</label><label className="course-file-picker"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; setCoverFileName(file?.name ?? ""); void uploadCover(file); }} /><span className="btn secondary">Обрати файл</span><span className="muted">{coverFileName || "Файл не вибрано"}</span></label></div>
           </div>
           <div className="field" style={{ marginTop: 12 }}><label>Опис</label><textarea className="textarea" name="description" defaultValue={detail.course.description ?? ""} rows={3} /></div>
           <button className="btn secondary" style={{ marginTop: 12 }} type="submit">Зберегти</button>
         </form>
 
-        <section className="card">
+        <section className="card course-builder-card course-structure-card">
           <div className="row" style={{ justifyContent: "space-between" }}><div><h2>Структура курсу</h2><p className="muted">Перетягуйте модулі та уроки. На телефоні використовуйте стрілки.</p></div></div>
           <form className="row" onSubmit={addModule}><input className="input" style={{ maxWidth: 420 }} placeholder="Назва нового модуля" value={moduleTitle} onChange={e => setModuleTitle(e.target.value)} /><button className="btn secondary">+ Модуль</button></form>
           <div className="course-module-list">
@@ -125,9 +150,9 @@ export function CourseBuilderPage({ courseId }: { courseId: string }) {
           </div>
         </section>
 
-        <section className="card"><div className="row" style={{ justifyContent: "space-between" }}><div><h2>Плани доступу</h2><p className="muted">Тривалість/фіксований дедлайн, ціна та доступ до пояснень тестів.</p></div><button className="btn secondary" onClick={() => setShowPlan(true)}>+ План</button></div><div className="stack">{detail.plans.map(plan => <PlanRow key={plan.id} plan={plan} onSaved={load} onError={setError} />)}{!detail.plans.length && <div className="muted">Планів ще немає.</div>}</div></section>
+        <section className="card course-builder-card course-plans-card"><div className="row" style={{ justifyContent: "space-between" }}><div><h2>Плани доступу</h2><p className="muted">Тривалість/фіксований дедлайн, ціна та доступ до пояснень тестів.</p></div><button className="btn secondary" onClick={() => setShowPlan(true)}>+ План</button></div><div className="stack">{detail.plans.map(plan => <PlanRow key={plan.id} plan={plan} onSaved={load} onError={setError} />)}{!detail.plans.length && <div className="muted">Планів ще немає.</div>}</div></section>
       </div>
-      <aside className="stack course-builder-help"><div className="card"><h2>Готовність до публікації</h2><Readiness detail={detail} /><p className="muted" style={{marginTop:12}}>Курс можна опублікувати, коли є хоча б один модуль, один опублікований урок із контентом та один активний план доступу.</p></div><div className="card"><h2>Доступ і прогрес</h2><div className="grid cols-2"><div><div className="metric">{progress?.active_licenses ?? 0}</div><div className="muted">активних ліцензій</div></div><div><div className="metric">{progress?.enrolled_students ?? 0}</div><div className="muted">учнів</div></div></div><div style={{marginTop:14}}><strong>Середній прогрес: {progress?.averageProgressPercent ?? 0}%</strong><div className="progress"><span style={{width:`${progress?.averageProgressPercent ?? 0}%`}} /></div></div>{progress?.students?.slice(0,8).map((student:any)=><button className="history-list-row course-history-button" key={student.course_enrollment_id} onClick={() => setProgressEnrollmentId(student.course_enrollment_id)}><strong>{student.last_name} {student.first_name}</strong><span className="muted">{student.completed_count}/{student.lesson_count} · {student.progressPercent}%</span></button>)}</div></aside>{progressEnrollmentId && <AdminCourseStudentProgressSheet enrollmentId={progressEnrollmentId} onClose={() => setProgressEnrollmentId(null)}/>}
+      <aside className="stack course-builder-help"><div className="card course-builder-side-card"><h2>Готовність до публікації</h2><Readiness detail={detail} /><p className="muted" style={{marginTop:12}}>Курс можна опублікувати, коли є хоча б один модуль, один опублікований урок із контентом та один активний план доступу.</p></div><div className="card course-builder-side-card"><h2>Доступ і прогрес</h2><div className="grid cols-2"><div><div className="metric">{progress?.active_licenses ?? 0}</div><div className="muted">активних ліцензій</div></div><div><div className="metric">{progress?.enrolled_students ?? 0}</div><div className="muted">учнів</div></div></div><div style={{marginTop:14}}><strong>Середній прогрес: {progress?.averageProgressPercent ?? 0}%</strong><div className="progress"><span style={{width:`${progress?.averageProgressPercent ?? 0}%`}} /></div></div>{progress?.students?.slice(0,8).map((student:any)=><button className="history-list-row course-history-button" key={student.course_enrollment_id} onClick={() => setProgressEnrollmentId(student.course_enrollment_id)}><strong>{student.last_name} {student.first_name}</strong><span className="muted">{student.completed_count}/{student.lesson_count} · {student.progressPercent}%</span></button>)}</div></aside>{progressEnrollmentId && <AdminCourseStudentProgressSheet enrollmentId={progressEnrollmentId} onClose={() => setProgressEnrollmentId(null)}/>}
     </div>
 
     {showPlan && <PlanForm courseId={courseId} onClose={() => setShowPlan(false)} onSaved={() => { setShowPlan(false); void load(); }} onError={setError} />}
@@ -178,7 +203,7 @@ function LessonBuilder({ lessonId, onClose }: { lessonId: string; onClose: () =>
     {mode === "TEXT" && <TextBlockForm lessonId={lessonId} position={data.blocks.length + 1} onDone={() => { setMode(null); void load(); }} onError={setError} />}
     {mode === "PDF" && <PdfBlockForm lessonId={lessonId} position={data.blocks.length + 1} onDone={() => { setMode(null); void load(); }} onError={setError} />}
     {mode === "TEST" && <TestBlockForm lessonId={lessonId} subjectId={data.lesson.subject_id} position={data.blocks.length + 1} onDone={() => { setMode(null); void load(); }} onError={setError} />}
-    <div className="stack">{data.blocks.map((block: any, index: number) => <div className="course-block-card" key={block.id} draggable onDragStart={() => setDragId(block.id)} onDragOver={e => e.preventDefault()} onDrop={() => { if (!dragId || dragId === block.id) return; const from = data.blocks.findIndex((item: any) => item.id === dragId); void reorder(move(data.blocks, from, index).map((item: any) => item.id)); setDragId(null); }}><div className="row" style={{ justifyContent: "space-between" }}><div className="row"><span className="drag-handle">⋮⋮</span><span className="badge">{block.type}</span><strong>Блок {index + 1}</strong></div><div className="row"><button className="btn secondary tiny-btn" disabled={index === 0} onClick={() => void reorder(move(data.blocks, index, index - 1).map((item: any) => item.id))}>↑</button><button className="btn secondary tiny-btn" disabled={index === data.blocks.length - 1} onClick={() => void reorder(move(data.blocks, index, index + 1).map((item: any) => item.id))}>↓</button><button className="btn danger tiny-btn" onClick={() => void deleteBlock(block.id)}>Видалити</button></div></div>{block.type === "TEXT" && <TextBlock block={block} onSaved={load} onError={setError} />}{block.type === "PDF" && <div className="stack"><div><strong>{block.original_filename}</strong></div><div className="row"><span className={`badge ${block.asset_status === "READY" ? "paid" : "booked"}`}>{block.asset_status}</span><span className="muted">{block.pdf_page_count ? `${block.pdf_page_count} стор.` : block.processing_error || "Обробляємо PDF…"}</span></div>{block.asset_status === "READY" && <a className="btn secondary" target="_blank" href={`${API_URL}/files/${block.asset_id}/content`}>Перевірити оригінал (Admin)</a>}</div>}{block.type === "TEST" && <TestBlockEditor testId={block.test_id} subjectId={data.lesson.subject_id} onError={setError} />}</div>)}</div>
+    <div className="stack">{data.blocks.map((block: any, index: number) => <div className="course-block-card" key={block.id} draggable onDragStart={() => setDragId(block.id)} onDragOver={e => e.preventDefault()} onDrop={() => { if (!dragId || dragId === block.id) return; const from = data.blocks.findIndex((item: any) => item.id === dragId); void reorder(move(data.blocks, from, index).map((item: any) => item.id)); setDragId(null); }}><div className="row" style={{ justifyContent: "space-between" }}><div className="row"><span className="drag-handle">⋮⋮</span><span className="badge">{blockTypeLabel(block.type)}</span><strong>Блок {index + 1}</strong></div><div className="row"><button className="btn secondary tiny-btn" disabled={index === 0} onClick={() => void reorder(move(data.blocks, index, index - 1).map((item: any) => item.id))}>↑</button><button className="btn secondary tiny-btn" disabled={index === data.blocks.length - 1} onClick={() => void reorder(move(data.blocks, index, index + 1).map((item: any) => item.id))}>↓</button><button className="btn danger tiny-btn" onClick={() => void deleteBlock(block.id)}>Видалити</button></div></div>{block.type === "TEXT" && <TextBlock block={block} onSaved={load} onError={setError} />}{block.type === "PDF" && <div className="stack"><div><strong>{block.original_filename}</strong></div><div className="row"><span className={`badge ${block.asset_status === "READY" ? "paid" : "booked"}`}>{assetStatusLabel(block.asset_status)}</span><span className="muted">{block.pdf_page_count ? `${block.pdf_page_count} стор.` : block.processing_error || "Обробляємо PDF…"}</span></div>{block.asset_status === "READY" && <a className="btn secondary" target="_blank" href={`${API_URL}/files/${block.asset_id}/content`}>Перевірити оригінал (Admin)</a>}</div>}{block.type === "TEST" && <TestBlockEditor testId={block.test_id} subjectId={data.lesson.subject_id} onError={setError} />}</div>)}</div>
   </div></aside></div>;
 }
 
