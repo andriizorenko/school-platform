@@ -79,7 +79,7 @@ export function OpsDashboard({ role }: { role: "ADMIN"|"MANAGER" }) {
     <section className="glass-dashboard-head">
       <div>
         <div className="dashboard-eyebrow">Операційний центр школи</div>
-        <h1>{role === "ADMIN" ? "Стан школи" : "Панель менеджера"}</h1>
+        <h1>{role === "ADMIN" ? "Стан школи" : "Головна менеджера"}</h1>
         <p className="muted">Ключові показники, сьогоднішні заняття та задачі, які потребують уваги.</p>
       </div>
       <div className="dashboard-date"><span>Сьогодні</span><strong>{currentDate}</strong></div>
