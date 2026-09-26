@@ -16,6 +16,9 @@ ENV NODE_ENV=production
 ENV RELEASE_SHA=${RELEASE_SHA}
 LABEL org.opencontainers.image.title="school-platform-worker" \
       org.opencontainers.image.revision="${RELEASE_SHA}"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
 COPY --from=build /app /app
 CMD ["node", "apps/worker/dist/main.js"]
