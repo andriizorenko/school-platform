@@ -881,3 +881,106 @@ th { background: rgba(247,249,255,.74); }
   .payment-preview-date { grid-column:1/-1; }
   .payment-preview-row .badge { justify-self:end; }
 }
+
+
+/* Glass calendar + lesson action surfaces */
+.calendar-toolbar,
+.calendar-filters {
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.86);
+  border-radius: 18px;
+  background: rgba(255,255,255,.58);
+  box-shadow: 0 10px 26px rgba(53,72,136,.05);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+.calendar-period { color:#566183; }
+.calendar-day,
+.calendar-month-day {
+  background: linear-gradient(150deg,rgba(255,255,255,.82),rgba(247,250,255,.68));
+  border-color: rgba(111,126,185,.14);
+  box-shadow: 0 10px 26px rgba(53,72,136,.045), inset 0 1px 0 rgba(255,255,255,.82);
+  backdrop-filter: blur(12px);
+}
+.calendar-day.today,
+.calendar-month-day.today {
+  border-color: rgba(74,99,231,.52);
+  box-shadow: 0 0 0 2px rgba(74,99,231,.10), 0 12px 28px rgba(53,72,136,.06);
+}
+.calendar-day h3 {
+  background: rgba(250,252,255,.88);
+  border-radius: 9px;
+  padding: 6px 8px;
+}
+.event {
+  background: rgba(255,255,255,.82);
+  border-color: rgba(111,126,185,.16);
+  border-left-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(53,72,136,.045);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.event:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(53,72,136,.09);
+  border-color: rgba(74,99,231,.24);
+}
+.event.completed {
+  border-left-color: #40a57d;
+  background: linear-gradient(145deg,rgba(249,255,252,.92),rgba(234,249,242,.78));
+}
+.event.charged-no-show {
+  border-color: rgba(213,111,103,.24);
+  border-left-color: #d56f67;
+  background: linear-gradient(145deg,rgba(255,250,249,.94),rgba(253,235,233,.82));
+}
+.event.cancelled {
+  opacity: .74;
+  border-left-color:#8d96ad;
+  background:rgba(246,248,252,.74);
+}
+.session-actions {
+  padding-top: 2px;
+}
+.session-action-form {
+  margin-top: 4px;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 18px;
+  background: linear-gradient(145deg,rgba(255,255,255,.80),rgba(246,249,255,.68));
+  box-shadow: 0 12px 28px rgba(53,72,136,.055);
+  backdrop-filter: blur(16px);
+}
+.notice-card {
+  border-color: rgba(206,160,74,.24);
+  background: linear-gradient(145deg,rgba(255,252,244,.95),rgba(255,246,221,.78));
+  color:#75501b;
+}
+.choice-card {
+  border-radius: 13px;
+  border-color: rgba(111,126,185,.17);
+  background: rgba(255,255,255,.72);
+}
+.choice-card:hover { border-color: rgba(74,99,231,.28); }
+.choice-card.selected {
+  border-color: rgba(74,99,231,.42);
+  background: linear-gradient(145deg,rgba(244,247,255,.96),rgba(232,238,255,.82));
+  box-shadow: 0 0 0 2px rgba(74,99,231,.08);
+}
+.free-slot-day {
+  border-color: rgba(111,126,185,.14);
+  background: rgba(249,251,255,.72);
+  border-radius: 14px;
+}
+.slot-button {
+  border-color: rgba(111,126,185,.18);
+  background: rgba(255,255,255,.82);
+}
+.slot-button:hover {
+  border-color: rgba(74,99,231,.34);
+  color: var(--accent);
+}
+.slot-button.selected {
+  background: linear-gradient(135deg,var(--accent),#6574ee);
+  border-color: transparent;
+  color:white;
+  box-shadow:0 8px 18px rgba(70,91,214,.15);
+}
