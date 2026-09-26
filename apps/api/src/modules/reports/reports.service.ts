@@ -271,6 +271,7 @@ export class ReportsService {
         .returning();
 
       const teacherRecipient = target?.actual_teacher_id ?? row.teacher_id;
+      const targetStartsAt = target?.starts_at ? new Date(target.starts_at) : null;
       await this.outbox.publishNotification(
         {
           aggregateType: "ProgressReportRequest",
@@ -278,7 +279,7 @@ export class ReportsService {
           recipientUserIds: [teacherRecipient],
           eventType: "REPORT_REQUESTED",
           title: "Потрібен звіт про успішність",
-          body: `${row.first_name} ${row.last_name} · ${row.subject_name}${target ? ` · найближче заняття ${target.starts_at.toISOString()}` : ""}`,
+          body: `${row.first_name} ${row.last_name} · ${row.subject_name}${targetStartsAt ? ` · найближче заняття ${targetStartsAt.toISOString()}` : ""}`,
           actionPath: `/teacher/students/${studentId}`,
           entityType: "ProgressReportRequest",
           entityId: request.id,
