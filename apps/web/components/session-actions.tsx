@@ -120,7 +120,8 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [incidentComment, setIncidentComment] = useState("");
-  const [rescheduleAfterNoShow, setRescheduleAfterNoShow] = useState(false);
+  const [rescheduleAfterIncident, setRescheduleAfterIncident] = useState<null | "student-no-show" | "teacher-late-cancellation">(null);
+  const [teacherCompensationGranted, setTeacherCompensationGranted] = useState(false);
   const [firstLessonAmount, setFirstLessonAmount] = useState("");
   const [firstLessonPaymentMethod, setFirstLessonPaymentMethod] = useState("BANK_TRANSFER");
   const [firstLessonPriceLoading, setFirstLessonPriceLoading] = useState(false);
@@ -186,7 +187,10 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
 
   function open(next: Action) {
     setError("");
-    if (next !== "reschedule") setRescheduleAfterNoShow(false);
+    if (next !== "reschedule") {
+      setRescheduleAfterIncident(null);
+      setTeacherCompensationGranted(false);
+    }
     if (next === "reschedule") {
       setSlotDays(14);
       setSlotData(null);
@@ -306,10 +310,17 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
         body: JSON.stringify({ comment: incidentComment.trim() || undefined }),
       });
 
-      if (kind === "student-no-show" && result?.requiresReschedule) {
-        setRescheduleReason("STUDENT_CANNOT_ATTEND");
-        setRescheduleComment(incidentComment.trim() || "Відпрацювання після пропуску");
-        setRescheduleAfterNoShow(true);
+      if (result?.requiresReschedule) {
+        if (kind === "student-no-show") {
+          setRescheduleReason("STUDENT_CANNOT_ATTEND");
+          setRescheduleComment(incidentComment.trim() || "Відпрацювання після пропуску");
+          setRescheduleAfterIncident("student-no-show");
+        } else {
+          setRescheduleReason("TEACHER_PERSONAL");
+          setRescheduleComment(incidentComment.trim() || "Перенесення після пізнього скасування викладача");
+          setTeacherCompensationGranted(Boolean(result?.compensationGranted));
+          setRescheduleAfterIncident("teacher-late-cancellation");
+        }
         setAction("reschedule");
         return;
       }
@@ -375,10 +386,11 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       <form className="stack session-action-form" onSubmit={submitReschedule}>
         <div className="row action-form-head">
           <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
-          <strong>{rescheduleAfterNoShow ? "Домовитись про відпрацювання" : "Перенести заняття"}</strong>
+          <strong>{rescheduleAfterIncident === "student-no-show" ? "Домовитись про відпрацювання" : rescheduleAfterIncident === "teacher-late-cancellation" ? "Перенести після скасування" : "Перенести заняття"}</strong>
         </div>
 
-        {rescheduleAfterNoShow && <div className="notice-card"><strong>Пропуск зафіксовано без списання.</strong><div className="muted" style={{marginTop:6}}>Якщо узгоджуєте відпрацювання, оберіть вільну годину викладача нижче або перенесіть заняття в кінець абонементу.</div></div>}
+        {rescheduleAfterIncident === "student-no-show" && <div className="notice-card"><strong>Пропуск зафіксовано без списання.</strong><div className="muted" style={{marginTop:6}}>Якщо узгоджуєте відпрацювання, оберіть вільну годину викладача нижче або перенесіть заняття в кінець абонементу.</div></div>}
+        {rescheduleAfterIncident === "teacher-late-cancellation" && <div className="notice-card"><strong>{teacherCompensationGranted ? "Повторне пізнє скасування зафіксовано. Учню нараховано компенсаційне заняття." : "Пізнє скасування зафіксовано без списання заняття."}</strong><div className="muted" style={{marginTop:6}}>Оберіть нову вільну годину викладача або перенесіть заняття в кінець абонементу.</div></div>}
 
         <RescheduleReasonFields role={role} value={rescheduleReason} onChange={setRescheduleReason} />
 
@@ -404,8 +416,8 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
         <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
         {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
         {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : rescheduleAfterNoShow ? "Відпрацювати у вибрану годину" : "Перенести на вибрану годину"}</button>
-        {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterNoShow ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
+        <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : rescheduleAfterIncident === "student-no-show" ? "Відпрацювати у вибрану годину" : "Перенести на вибрану годину"}</button>
+        {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterIncident === "student-no-show" ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
       </form>
     );
   }
@@ -439,7 +451,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
     return (
       <form className="stack session-action-form" onSubmit={(event) => submitIncident(event, action)}>
         <div className="row action-form-head"><button type="button" className="link-button" onClick={() => open(null)}>← Назад</button><strong>{studentNoShow ? "Учень не прийшов" : "Пізнє скасування викладача"}</strong></div>
-        <div className="notice-card">{studentNoShow ? "Система застосує правило першого/другого no-show для цього предмета." : "Система застосує правило порушень викладача для цієї пари викладач–учень."}</div>
+        <div className="notice-card">{studentNoShow ? "Система застосує правило першого/другого пропуску для цього предмета." : "Система застосує правило першого/другого пізнього скасування для цієї пари викладач–учень."}</div>
         <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={incidentComment} onChange={(event) => setIncidentComment(event.target.value)} placeholder="Обставини події — необовʼязково" /></div>
         {error && <div className="error">{error}</div>}
         <button className="btn danger" disabled={busy}>{busy ? "Фіксуємо…" : "Підтвердити"}</button>
@@ -453,7 +465,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       {detail.capabilities.canMark && <button disabled={busy} className="btn" onClick={() => open("mark")}>Відмітити урок</button>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
-      {detail.capabilities.canReportIncident && role === "TEACHER" && <><button disabled={busy} className="btn secondary" onClick={() => open("student-no-show")}>Учень не прийшов</button><button disabled={busy} className="btn secondary" onClick={() => open("teacher-late-cancellation")}>Не можу провести (пізнє скасування)</button></>}
+      {detail.capabilities.canReportIncident && (role === "TEACHER" || role === "MANAGER" || role === "ADMIN") && <><button disabled={busy} className="btn secondary" onClick={() => open("student-no-show")}>Учень не прийшов</button><button disabled={busy} className="btn secondary" onClick={() => open("teacher-late-cancellation")}>{role === "TEACHER" ? "Не можу провести (пізнє скасування)" : "Пізнє скасування викладача"}</button></>}
       {journalHref && <Link className="btn secondary" href={journalHref}>Журнал учня</Link>}
     </div>
   );
