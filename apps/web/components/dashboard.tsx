@@ -41,6 +41,23 @@ function subjectName(event: TodayEvent) { return event.subject?.name ?? event.su
 function funding(event: TodayEvent) { return event.fundingStatus ?? event.funding_status ?? "BOOKED"; }
 function sessionType(event: TodayEvent) { return event.sessionType ?? event.session_type ?? "REGULAR"; }
 
+function paymentStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    PAID: "Оплачено",
+    PARTIALLY_REFUNDED: "Частково повернено",
+    REFUNDED: "Повернено",
+    CANCELLED: "Скасовано",
+    PENDING_PAYMENT: "Очікує оплату",
+  };
+  return status ? (labels[status] ?? status) : "—";
+}
+
+function paymentStatusClass(status?: string | null) {
+  if (status === "PAID") return "paid";
+  if (status === "PARTIALLY_REFUNDED" || status === "REFUNDED") return "booked";
+  return "";
+}
+
 function KpiCard({ label, value, help, tone = "blue" }: { label: string; value: React.ReactNode; help: React.ReactNode; tone?: "blue"|"mint"|"amber"|"violet" }) {
   return <article className={`glass-kpi glass-kpi-${tone}`}>
     <div className="glass-kpi-top"><span className="glass-kpi-dot" /><span>{label}</span></div>
@@ -159,8 +176,11 @@ export function OpsDashboard({ role }: { role: "ADMIN"|"MANAGER" }) {
                 <strong>{payment.student_last_name || payment.parent_last_name} {payment.student_first_name || payment.parent_first_name}</strong>
                 <span>{payment.subject_name ?? "Інша оплата"}</span>
               </div>
-              <strong className="payment-preview-amount">{money(payment.total_minor, payment.currency)}</strong>
-              <span className={`badge ${payment.status === "PAID" ? "paid" : "booked"}`}>{payment.status === "PAID" ? "Оплачено" : payment.status}</span>
+              <div className="payment-preview-money">
+                <strong className="payment-preview-amount">{money(payment.total_minor, payment.currency)}</strong>
+                {Number(payment.refunded_minor ?? 0) > 0 && <small>повернено {money(payment.refunded_minor, payment.currency)}</small>}
+              </div>
+              <span className={`badge ${paymentStatusClass(payment.status)}`}>{paymentStatusLabel(payment.status)}</span>
             </div>)}
             {!payments.length && <div className="empty compact-empty">Оплат поки немає.</div>}
           </div>
