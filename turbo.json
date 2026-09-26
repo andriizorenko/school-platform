@@ -2,23 +2,57 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "dev": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "PAYMENT_PROVIDER",
+        "PAYMENT_DEFAULT_PROVIDER",
+        "LIQPAY_ENABLED",
+        "LIQPAY_PUBLIC_KEY",
+        "LIQPAY_PRIVATE_KEY",
+        "LIQPAY_CALLBACK_URL",
+        "LIQPAY_RESULT_URL",
+        "LIQPAY_API_URL",
+        "LIQPAY_CHECKOUT_URL",
+        "MONO_ENABLED",
+        "MONO_TOKEN",
+        "MONO_WEBHOOK_URL",
+        "MONO_RESULT_URL",
+        "MONO_API_URL",
+        "MONO_WEBHOOK_PUBLIC_KEY_BASE64"
+      ]
     },
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "dist/**"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^build", "^typecheck"]
+      "dependsOn": [
+        "^build",
+        "^typecheck"
+      ]
     },
     "test": {
-      "dependsOn": ["^build", "^test"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "^build",
+        "^test"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     }
   }
 }
