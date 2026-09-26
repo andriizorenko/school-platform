@@ -16,7 +16,7 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "form-action 'self'",
   `connect-src 'self' ${apiOrigin}`,
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${apiOrigin}`,
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   production ? "script-src 'self' 'unsafe-inline'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
