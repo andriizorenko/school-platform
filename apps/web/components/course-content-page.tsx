@@ -35,7 +35,14 @@ function PdfViewer({ block, watermark }: { block: any; watermark: string }) {
   if (block.asset_status === "PROCESSING") return <div className="warning-note">Матеріал ще обробляється. Спробуйте оновити урок через кілька секунд.</div>;
   if (block.asset_status === "FAILED") return <div className="error">Не вдалося підготувати PDF для перегляду. Повідомте адміністратора.</div>;
   if (!pages.length) return <div className="muted">Сторінки PDF ще не готові.</div>;
-  return <div className="pdf-page-viewer"><div className="muted">{pages.length} стор. · матеріал відкривається лише всередині платформи</div>{pages.map((page: any) => <div className="pdf-page" key={page.assetId}><img src={`${API_URL}/files/${page.assetId}/content`} alt={`Сторінка ${page.pageNumber}`} draggable={false} /><div className="pdf-watermark-layer" aria-hidden="true"><span>{watermark}</span><span>{watermark}</span><span>{watermark}</span></div><span className="pdf-page-number">{page.pageNumber}</span></div>)}</div>;
+  const watermarkPositions = [
+    { left: "30%", top: "18%" },
+    { left: "70%", top: "34%" },
+    { left: "34%", top: "52%" },
+    { left: "68%", top: "68%" },
+    { left: "34%", top: "84%" },
+  ];
+  return <div className="pdf-page-viewer"><div className="muted">{pages.length} стор. · матеріал відкривається лише всередині платформи</div>{pages.map((page: any) => <div className="pdf-page" key={page.assetId}><img src={`${API_URL}/files/${page.assetId}/content`} alt={`Сторінка ${page.pageNumber}`} draggable={false} />{watermark && <div className="pdf-watermark-layer" aria-hidden="true" style={{ position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none", overflow: "hidden" }}>{watermarkPositions.map((position, index) => <span key={index} style={{ position: "absolute", left: position.left, top: position.top, transform: "translate(-50%, -50%) rotate(-27deg)", fontSize: "clamp(18px, 2.5vw, 34px)", fontWeight: 800, letterSpacing: ".02em", color: "rgba(17, 26, 58, .13)", textShadow: "0 1px 0 rgba(255,255,255,.7)", whiteSpace: "nowrap", userSelect: "none" }}>{watermark}</span>)}</div>}<span className="pdf-page-number">{page.pageNumber}</span></div>)}</div>;
 }
 
 function TestSheet({ test, answers, setAnswers, result, onFinish, onClose, onTutorRequest }: any) {
