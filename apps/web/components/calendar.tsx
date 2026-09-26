@@ -165,10 +165,29 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const shift = (amount: number) => setAnchor(d => mode === "month" ? new Date(d.getFullYear(), d.getMonth()+amount, 1) : addDays(d, mode === "day" ? amount : amount*7));
   const teacherLabel = (event: CalendarEvent) => showGlobalFilters && event.teacher?.fullName ? ` · ${event.teacher.fullName}` : "";
 
-  const card = (e: CalendarEvent) => <button key={e.id} className={`event ${lifecycleStatus(e)==="COMPLETED"?"completed":lifecycleStatus(e)==="CHARGED_NO_SHOW"?"charged-no-show":lifecycleStatus(e)==="CANCELLED"?"cancelled":""}`} onClick={()=>setSelected(e)}>
+  const eventClass = (e: CalendarEvent) => lifecycleStatus(e)==="COMPLETED"?"completed":lifecycleStatus(e)==="CHARGED_NO_SHOW"?"charged-no-show":lifecycleStatus(e)==="CANCELLED"?"cancelled":"";
+  const card = (e: CalendarEvent) => <button key={e.id} className={`event ${eventClass(e)}`} onClick={()=>setSelected(e)}>
     <div className="event-time">{timeOnly(eventStart(e))}–{timeOnly(eventEnd(e))}</div>
     <div className="row" style={{marginTop:6}}><span className={`badge ${sessionType(e)==="FIRST"?"first":""}`}>{sessionType(e)==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${funding(e).toLowerCase()}`}>{funding(e)==="PAID"?"Сплачено":"Бронь"}</span>{lifecycleStatus(e)==="COMPLETED"&&<span className="badge success-badge">Проведено</span>}{lifecycleStatus(e)==="CHARGED_NO_SHOW"&&<span className="badge charged-no-show-badge">Списано</span>}{lifecycleStatus(e)==="CANCELLED"&&<span className="badge cancelled-badge">Скасовано</span>}{(e.needsReport??e.needs_report) && <span className="badge report">ТРЕБА ЗВІТ</span>}</div>
     <div className="event-title">{studentName(e)}</div><div className="muted" style={{fontSize:12}}>{subjectName(e)}{teacherLabel(e)}</div>
+  </button>;
+
+  const compactCard = (e: CalendarEvent) => <button
+    key={e.id}
+    className={`event compact-week-event ${eventClass(e)}`}
+    onClick={()=>setSelected(e)}
+    aria-label={`${timeOnly(eventStart(e))}–${timeOnly(eventEnd(e))}, ${studentName(e)}, ${subjectName(e)}`}
+  >
+    <div className="compact-event-top">
+      <strong>{timeOnly(eventStart(e))}</strong>
+      <span className={`compact-payment-dot ${funding(e).toLowerCase()}`} title={funding(e)==="PAID"?"Сплачено":"Бронь"} />
+      {sessionType(e)==="FIRST"&&<span className="compact-event-chip first">1-й</span>}
+      {(e.needsReport??e.needs_report)&&<span className="compact-event-chip report">ЗВІТ</span>}
+      {lifecycleStatus(e)==="CHARGED_NO_SHOW"&&<span className="compact-event-chip danger">ПРОПУСК</span>}
+      {lifecycleStatus(e)==="CANCELLED"&&<span className="compact-event-chip muted">СКАС.</span>}
+    </div>
+    <div className="compact-event-student">{studentName(e)}</div>
+    <div className="compact-event-subject">{subjectName(e)}{teacherLabel(e)}</div>
   </button>;
 
   function updateFilter(key: keyof CalendarFilters, value: string) {
@@ -200,13 +219,21 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     <div className="calendar-toolbar">
       <div className="row"><button className="btn secondary" onClick={()=>shift(-1)}>←</button><button className="btn secondary" onClick={()=>setAnchor(new Date())}>Сьогодні</button><button className="btn secondary" onClick={()=>shift(1)}>→</button></div>
       <strong className="calendar-period">{periodLabel}</strong>
-      <div className="row calendar-modes desktop-modes"><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button><button className={`btn ${mode==="month"?"":"secondary"}`} onClick={()=>setMode("month")}>Місяць</button></div>
+      <div className="row calendar-modes desktop-modes"><button className={`btn ${mode==="day"?"":"secondary"}`} onClick={()=>setMode("day")}>День</button><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button><button className={`btn ${mode==="month"?"":"secondary"}`} onClick={()=>setMode("month")}>Місяць</button></div>
       <div className="row calendar-modes mobile-modes"><button className={`btn ${mode==="day"?"":"secondary"}`} onClick={()=>setMode("day")}>День</button><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button></div>
     </div>
     {error && <div className="error" style={{marginBottom:12}}>{error}</div>}
 
     {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
-      <div className="calendar-week">{days.map(d => <section className={`calendar-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><h3>{dateOnly(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted" style={{fontSize:12}}>Немає занять</div>}</section>)}</div>
+      <div className="calendar-week">{days.map(d => {
+        const dayEvents = eventsFor(d);
+        const visibleEvents = dayEvents.slice(0, 5);
+        return <section className={`calendar-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}>
+          <div className="calendar-day-heading"><h3>{dateOnly(d)}</h3>{dayEvents.length>0&&<span className="calendar-day-count">{dayEvents.length}</span>}</div>
+          {visibleEvents.length ? visibleEvents.map(compactCard) : <div className="muted calendar-day-empty">Немає занять</div>}
+          {dayEvents.length>visibleEvents.length&&<button className="calendar-day-more" type="button" onClick={()=>{setAnchor(d);setMode("day")}}>Ще {dayEvents.length-visibleEvents.length} · відкрити день</button>}
+        </section>;
+      })}</div>
       <div className="mobile-day-nav">{days.map(d => <button key={dateParam(d)} onClick={()=>refs.current[dateParam(d)]?.scrollIntoView({behavior:"smooth",block:"start"})}>{new Intl.DateTimeFormat("uk-UA",{weekday:"short",timeZone:"Europe/Kyiv"}).format(d)}<br/><small>{d.getDate()}</small></button>)}</div>
       <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
     </>}
