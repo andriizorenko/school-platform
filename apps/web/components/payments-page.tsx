@@ -18,6 +18,28 @@ function paymentStatusLabel(status?: string | null) {
   return status ? (labels[status] ?? status) : "—";
 }
 
+function paymentMethodLabel(method?: string | null) {
+  const labels: Record<string, string> = {
+    CARD: "Картка",
+    BANK_TRANSFER: "Банківський переказ",
+    CASH: "Готівка",
+    OTHER: "Інше",
+  };
+  return method ? (labels[method] ?? method) : "—";
+}
+
+function providerStatusLabel(status?: string | null) {
+  const labels: Record<string, string> = {
+    success: "Підтверджено провайдером",
+    refund_success: "Повернення підтверджено",
+    processing: "В обробці",
+    failure: "Відхилено провайдером",
+    expired: "Термін оплати минув",
+    reversed: "Повернено провайдером",
+  };
+  return status ? (labels[String(status).toLowerCase()] ?? status) : "—";
+}
+
 export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
   const [rows, setRows] = useState<any[]>([]);
   const [reconciliation, setReconciliation] = useState<any[]>([]);
@@ -104,7 +126,7 @@ export function PaymentsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
       const refunded = Number(p.refunded_minor ?? 0);
       const refundable = Number(p.refundable_lesson_units ?? 0);
       const canRefund = ["LIQPAY", "MONO"].includes(p.provider) && ["PAID", "PARTIALLY_REFUNDED"].includes(p.status) && refundable >= 0.5;
-      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{p.method ?? "—"}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className={`badge ${p.status === "PAID" ? "paid" : p.status === "PARTIALLY_REFUNDED" ? "booked" : ""}`}>{paymentStatusLabel(p.status)}</span>{p.provider_status && <><br/><small className="muted">{p.provider_status}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => openRefund(p)}>Повернення</button>}</td></tr>;
+      return <tr key={p.id}><td>{dateTime(p.paid_at ?? p.created_at)}</td><td>{p.parent_last_name} {p.parent_first_name}<br/><span className="muted">{p.student_last_name} {p.student_first_name}</span></td><td>{p.subject_name ?? "Курс/інше"}</td><td>{p.lesson_units ?? "—"}{refundable > 0 && <><br/><small className="muted">можна повернути: {refundable}</small></>}</td><td><strong>{money(p.total_minor, p.currency)}</strong>{refunded > 0 && <><br/><small className="muted">повернено {money(refunded, p.currency)}</small></>}</td><td>{paymentMethodLabel(p.method)}{p.provider && <><br/><small className="muted">{p.provider}</small></>}</td><td><span className={`badge ${p.status === "PAID" ? "paid" : p.status === "PARTIALLY_REFUNDED" ? "booked" : ""}`}>{paymentStatusLabel(p.status)}</span>{p.provider_status && <><br/><small className="muted">{providerStatusLabel(p.provider_status)}</small></>}</td><td>{canRefund && <button className="btn secondary" disabled={busy} onClick={() => openRefund(p)}>Повернення</button>}</td></tr>;
     })}</tbody></table></div>}
     {refundPayment && <div className="sheet-backdrop" onClick={() => !busy && setRefundPayment(null)}>
       <aside className="sheet refund-sheet" onClick={(event) => event.stopPropagation()}>
