@@ -143,7 +143,11 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
             <div><div className="muted">Найближче заняття</div><strong>{enrollment.nextSession ? dateTime(enrollment.nextSession.startsAt) : "—"}</strong></div>
           </div>
 
-          {pending.map((request: any) => <div className="report-request-card" key={request.id}>
+          {pending.map((request: any) => <div
+            className="report-request-card"
+            id={request.id === student.pendingReports?.[0]?.id ? "pending-reports" : undefined}
+            key={request.id}
+          >
             <div className="row report-request-heading">
               <div>
                 <strong>Звіт за запитом батьків</strong>
