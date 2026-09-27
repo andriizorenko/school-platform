@@ -990,9 +990,9 @@ th { background: rgba(247,249,255,.74); }
 }
 .reschedule-party-field legend { grid-column: 1 / -1; }
 .reschedule-party-field .choice-card {
-  min-height: 62px;
-  padding: 9px 10px;
-  align-items: flex-start;
+  min-height: 46px;
+  padding: 9px 11px;
+  align-items: center;
 }
 .reschedule-situation-field { gap: 7px; }
 .reschedule-situation-field .choice-card { padding: 9px 11px; }
@@ -1006,7 +1006,7 @@ th { background: rgba(247,249,255,.74); }
 
 @media (max-width: 420px) {
   .reschedule-party-field { grid-template-columns: 1fr 1fr; }
-  .reschedule-party-field .choice-card { min-height: 58px; }
+  .reschedule-party-field .choice-card { min-height: 46px; }
 }
 .free-slot-day {
   border-color: rgba(111,126,185,.14);
