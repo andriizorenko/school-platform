@@ -58,23 +58,13 @@ export class LessonPoliciesService {
       await this.assertNoIncidentForCurrentOccurrence(tx, sessionId);
 
       const now = Date.now();
-      const lateNoticeCutoffMinutes = await numberSchoolSetting(tx, "lesson_late_notice_cutoff_minutes", 120);
-      const lateWindowStartsAt = session.starts_at.getTime() - lateNoticeCutoffMinutes * 60 * 1000;
-      if (now < lateWindowStartsAt) {
+      const noShowWaitMinutes = await numberSchoolSetting(tx, "student_no_show_wait_minutes", 15);
+      const noShowAvailableAt = session.starts_at.getTime() + noShowWaitMinutes * 60 * 1000;
+      if (now < noShowAvailableAt) {
         throw new ConflictException({
-          code: "STUDENT_LATE_NOTICE_WINDOW_NOT_OPEN",
-          message: `This is still an advance notice. Late/no-notice policy starts ${lateNoticeCutoffMinutes} minutes before lesson start`,
+          code: "NO_SHOW_WAIT_PERIOD_ACTIVE",
+          message: `Student no-show can only be recorded ${noShowWaitMinutes} minutes after lesson start`,
         });
-      }
-
-      if (!actor.roles.some((role) => PRIVILEGED_ROLES.has(role)) && now >= session.starts_at.getTime()) {
-        const noShowWaitMinutes = await numberSchoolSetting(tx, "student_no_show_wait_minutes", 15);
-        if (now < session.starts_at.getTime() + noShowWaitMinutes * 60 * 1000) {
-          throw new ConflictException({
-            code: "NO_SHOW_WAIT_PERIOD_ACTIVE",
-            message: `Teacher must wait ${noShowWaitMinutes} minutes after lesson start before recording a student no-show`,
-          });
-        }
       }
 
       const stateResult = await tx.execute(sql`
