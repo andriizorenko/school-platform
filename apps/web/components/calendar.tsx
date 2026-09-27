@@ -298,7 +298,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     <div className="event-title">{studentName(e)}</div><div className="muted" style={{fontSize:12}}>{subjectName(e)}{teacherLabel(e)}</div>
   </button>;
 
-  const compactLessonLabel = (e: CalendarEvent) => lifecycleStatus(e)==="CHARGED_NO_SHOW" ? "ПРОПУСК" : sessionType(e)==="FIRST" ? "Перший" : "Регулярний";
+  const compactLessonLabel = (e: CalendarEvent) => lifecycleStatus(e)==="CHARGED_NO_SHOW" ? "Пропуск" : sessionType(e)==="FIRST" ? "Перший" : "Регулярний";
   const compactLessonClass = (e: CalendarEvent) => lifecycleStatus(e)==="CHARGED_NO_SHOW" ? "danger" : sessionType(e)==="FIRST" ? "first" : "regular";
   const compactCard = (e: CalendarEvent) => <button
     key={e.id}
@@ -307,7 +307,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     aria-label={`${timeOnly(eventStart(e))}–${timeOnly(eventEnd(e))}, ${studentName(e)}, ${subjectName(e)}, ${compactLessonLabel(e)}`}
   >
     <div className="compact-event-top">
-      <strong>{timeOnly(eventStart(e))}-{timeOnly(eventEnd(e))}</strong>
+      <strong>{timeOnly(eventStart(e))}–{timeOnly(eventEnd(e))}</strong>
       <div className="compact-event-meta">
         <span className={`compact-payment-dot ${funding(e).toLowerCase()}`} title={funding(e)==="PAID"?"Сплачено":"Бронь"} aria-label={funding(e)==="PAID"?"Сплачено":"Бронь"} />
         <span className={`compact-event-chip ${compactLessonClass(e)}`}>{compactLessonLabel(e)}</span>
@@ -390,7 +390,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     const availability = teacherFreeWindowsFor(d);
     const dayEvents = eventsFor(d);
     const spanHours = Math.max(1, (timeline.end - timeline.start) / 60);
-    const height = Math.max(260, Math.min(760, spanHours * 56));
+    const height = Math.max(300, Math.min(960, spanHours * 64));
     return <section className={`teacher-timeline-day ${variant==="day"?"teacher-timeline-day-wide":""} ${dateParam(d)===todayKey?"today":""}`} key={dateParam(d)}>
       <div className="calendar-day-heading">
         <h3>{dateOnly(d)}</h3>
