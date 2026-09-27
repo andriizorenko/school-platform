@@ -58,6 +58,27 @@ type CalendarFilters = {
   fundingStatus: string;
 };
 
+type TeacherAvailabilityData = {
+  teacherId: string;
+  templates: Array<{
+    season: "SCHOOL_YEAR" | "SUMMER";
+    isActive: boolean;
+    windows: Array<{ dayOfWeek: number; startTime: string; endTime: string }>;
+  }>;
+  exceptions: Array<{
+    date: string;
+    isUnavailableAllDay: boolean;
+    windows: Array<{ startTime: string; endTime: string }>;
+  }>;
+  vacations: Array<{
+    startsOn: string;
+    endsOn: string;
+    status: string;
+  }>;
+};
+
+type ClockWindow = { start: number; end: number };
+
 const EMPTY_FILTERS: CalendarFilters = {
   teacherId: "",
   studentId: "",
@@ -77,6 +98,43 @@ function subjectName(e: CalendarEvent) { return e.subject?.name ?? e.subjectName
 function sessionType(e: CalendarEvent) { return e.sessionType ?? e.session_type ?? "REGULAR"; }
 function funding(e: CalendarEvent) { return e.fundingStatus ?? e.funding_status ?? "BOOKED"; }
 function lifecycleStatus(e: CalendarEvent) { return (e.status ?? "").toUpperCase(); }
+function clockMinutes(value: string) {
+  const [hour, minute] = String(value).slice(0,5).split(":").map(Number);
+  return hour * 60 + minute;
+}
+function clockLabel(value: number) {
+  const safe = Math.max(0, Math.min(24 * 60, value));
+  const hour = Math.floor(safe / 60);
+  const minute = safe % 60;
+  return `${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`;
+}
+function intersectClockWindows(base: ClockWindow[], overlays: ClockWindow[]) {
+  const result: ClockWindow[] = [];
+  for (const left of base) {
+    for (const right of overlays) {
+      const start = Math.max(left.start, right.start);
+      const end = Math.min(left.end, right.end);
+      if (end > start) result.push({ start, end });
+    }
+  }
+  return result.sort((a,b)=>a.start-b.start);
+}
+function subtractClockWindows(base: ClockWindow[], busy: ClockWindow[]) {
+  let result = [...base];
+  for (const block of busy) {
+    const next: ClockWindow[] = [];
+    for (const window of result) {
+      if (block.end <= window.start || block.start >= window.end) {
+        next.push(window);
+        continue;
+      }
+      if (block.start > window.start) next.push({ start: window.start, end: Math.min(block.start, window.end) });
+      if (block.end < window.end) next.push({ start: Math.max(block.end, window.start), end: window.end });
+    }
+    result = next;
+  }
+  return result.filter(item=>item.end>item.start).sort((a,b)=>a.start-b.start);
+}
 
 export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query?: string }) {
   const [anchor, setAnchor] = useState(() => new Date());
@@ -90,6 +148,8 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const [filters, setFilters] = useState<CalendarFilters>(EMPTY_FILTERS);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [filtersLoading, setFiltersLoading] = useState(false);
+  const [teacherAvailability, setTeacherAvailability] = useState<TeacherAvailabilityData | null>(null);
+  const [availabilityError, setAvailabilityError] = useState("");
   const refs = useRef<Record<string, HTMLElement | null>>({});
   const viewportResolved = useRef(false);
   const showGlobalFilters = role === "ADMIN" || role === "MANAGER";
@@ -116,6 +176,25 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       .catch((e: any) => setError(e?.message ?? "Не вдалося завантажити фільтри"))
       .finally(() => setFiltersLoading(false));
   }, [showGlobalFilters]);
+
+  useEffect(() => {
+    if (role !== "TEACHER") {
+      setTeacherAvailability(null);
+      setAvailabilityError("");
+      return;
+    }
+    let active = true;
+    setAvailabilityError("");
+    api<{ user: { id: string } }>("/auth/me")
+      .then((me) => api<TeacherAvailabilityData>(`/teachers/${me.user.id}/availability`))
+      .then((availability) => { if (active) setTeacherAvailability(availability); })
+      .catch((e: any) => {
+        if (!active) return;
+        setTeacherAvailability(null);
+        setAvailabilityError(e?.message ?? "Не вдалося завантажити доступні години");
+      });
+    return () => { active = false; };
+  }, [role]);
 
   const range = useMemo(() => {
     if (mode === "day") {
@@ -164,6 +243,53 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const eventsFor = (d: Date) => events.filter(e => { const s = new Date(eventStart(e)); return s.getFullYear()===d.getFullYear() && s.getMonth()===d.getMonth() && s.getDate()===d.getDate(); }).sort((a,b)=>eventStart(a).localeCompare(eventStart(b)));
   const shift = (amount: number) => setAnchor(d => mode === "month" ? new Date(d.getFullYear(), d.getMonth()+amount, 1) : addDays(d, mode === "day" ? amount : amount*7));
   const teacherLabel = (event: CalendarEvent) => showGlobalFilters && event.teacher?.fullName ? ` · ${event.teacher.fullName}` : "";
+
+  const teacherFreeWindowsFor = (d: Date) => {
+    if (role !== "TEACHER" || !teacherAvailability) return null;
+    const date = dateParam(d);
+    const approvedVacation = teacherAvailability.vacations?.find((item) =>
+      item.status === "APPROVED" && item.startsOn <= date && item.endsOn >= date,
+    );
+    if (approvedVacation) return { kind: "VACATION" as const, windows: [] as ClockWindow[] };
+
+    const season: "SCHOOL_YEAR" | "SUMMER" = d.getMonth() >= 5 && d.getMonth() <= 7 ? "SUMMER" : "SCHOOL_YEAR";
+    const dayOfWeek = ((d.getDay() + 6) % 7) + 1;
+    const template = teacherAvailability.templates?.find((item) => item.season === season && item.isActive);
+    let available: ClockWindow[] = (template?.windows ?? [])
+      .filter((window) => Number(window.dayOfWeek) === dayOfWeek)
+      .map((window) => ({ start: clockMinutes(window.startTime), end: clockMinutes(window.endTime) }))
+      .filter((window) => window.end > window.start);
+
+    const exception = teacherAvailability.exceptions?.find((item) => item.date === date);
+    if (exception?.isUnavailableAllDay) return { kind: "UNAVAILABLE" as const, windows: [] as ClockWindow[] };
+    if (exception?.windows?.length) {
+      const exceptionWindows = exception.windows
+        .map((window) => ({ start: clockMinutes(window.startTime), end: clockMinutes(window.endTime) }))
+        .filter((window) => window.end > window.start);
+      available = intersectClockWindows(available, exceptionWindows);
+    }
+
+    if (!available.length) return { kind: "UNAVAILABLE" as const, windows: [] as ClockWindow[] };
+
+    const busy = eventsFor(d)
+      .filter((event) => !["CANCELLED","EXPIRED_UNPAID"].includes(lifecycleStatus(event)))
+      .map((event) => ({ start: clockMinutes(timeOnly(eventStart(event))), end: clockMinutes(timeOnly(eventEnd(event))) }))
+      .filter((window) => window.end > window.start);
+
+    return { kind: "AVAILABLE" as const, windows: subtractClockWindows(available, busy) };
+  };
+
+  const availabilityLine = (d: Date) => {
+    const availability = teacherFreeWindowsFor(d);
+    if (!availability) return null;
+    if (availability.kind === "VACATION") return <div className="teacher-availability-line unavailable"><span className="teacher-availability-dot"/><span>Відпустка</span></div>;
+    if (availability.kind === "UNAVAILABLE") return <div className="teacher-availability-line unavailable"><span className="teacher-availability-dot"/><span>Недоступний</span></div>;
+    if (!availability.windows.length) return <div className="teacher-availability-line busy"><span className="teacher-availability-dot"/><span>Вільних годин немає</span></div>;
+    return <div className="teacher-availability-line" title="Доступні години з урахуванням уже запланованих занять">
+      <span className="teacher-availability-dot"/>
+      <span><strong>Доступно:</strong> {availability.windows.map((window)=>`${clockLabel(window.start)}–${clockLabel(window.end)}`).join(", ")}</span>
+    </div>;
+  };
 
   const eventClass = (e: CalendarEvent) => lifecycleStatus(e)==="COMPLETED"?"completed":lifecycleStatus(e)==="CHARGED_NO_SHOW"?"charged-no-show":lifecycleStatus(e)==="CANCELLED"?"cancelled":"";
   const card = (e: CalendarEvent) => <button key={e.id} className={`event ${eventClass(e)}`} onClick={()=>setSelected(e)}>
@@ -233,19 +359,21 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       <div className="row calendar-modes mobile-modes"><button className={`btn ${mode==="day"?"":"secondary"}`} onClick={()=>setMode("day")}>День</button><button className={`btn ${mode==="week"?"":"secondary"}`} onClick={()=>setMode("week")}>Тиждень</button></div>
     </div>
     {error && <div className="error" style={{marginBottom:12}}>{error}</div>}
+    {availabilityError && role === "TEACHER" && <div className="error" style={{marginBottom:12}}>{availabilityError}</div>}
 
-    {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
+    {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{availabilityLine(anchor)}{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
       <div className="calendar-week">{days.map(d => {
         const dayEvents = eventsFor(d);
         const visibleEvents = dayEvents.slice(0, 5);
         return <section className={`calendar-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}>
           <div className="calendar-day-heading"><h3>{dateOnly(d)}</h3>{dayEvents.length>0&&<span className="calendar-day-count">{dayEvents.length}</span>}</div>
+          {availabilityLine(d)}
           {visibleEvents.length ? visibleEvents.map(compactCard) : <div className="muted calendar-day-empty">Немає занять</div>}
           {dayEvents.length>visibleEvents.length&&<button className="calendar-day-more" type="button" onClick={()=>{setAnchor(d);setMode("day")}}>Ще {dayEvents.length-visibleEvents.length} · відкрити день</button>}
         </section>;
       })}</div>
       <div className="mobile-day-nav">{days.map(d => <button key={dateParam(d)} onClick={()=>refs.current[dateParam(d)]?.scrollIntoView({behavior:"smooth",block:"start"})}>{new Intl.DateTimeFormat("uk-UA",{weekday:"short",timeZone:"Europe/Kyiv"}).format(d)}<br/><small>{d.getDate()}</small></button>)}</div>
-      <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
+      <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{availabilityLine(d)}{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
     </>}
 
     {selected && <div className="sheet-backdrop" onClick={()=>setSelected(null)}><aside className="sheet" onClick={e=>e.stopPropagation()}><button className="sheet-close" onClick={()=>setSelected(null)}>×</button>{detailLoading?<div className="empty">Завантаження…</div>:detail?<div className="stack" style={{marginTop:40}}>
