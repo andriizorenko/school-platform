@@ -244,6 +244,23 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     api<SessionDetail>(`/sessions/${selected.id}`).then(setDetail).catch((e:any)=>setActionError(e.message)).finally(()=>setDetailLoading(false));
   }, [selected?.id]);
 
+  useEffect(() => {
+    if (!selected) return;
+
+    const body = document.body;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) body.style.paddingRight = `${scrollbarWidth}px`;
+
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+    };
+  }, [selected]);
+
   const weekStart = startOfWeek(anchor);
   const monthDays = Math.ceil((range.to.getTime() - range.from.getTime()) / 86_400_000) + 1;
   const days = Array.from({ length: mode === "month" ? monthDays : 7 }, (_, i) => addDays(mode === "month" ? range.from : weekStart, i));
