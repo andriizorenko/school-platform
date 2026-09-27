@@ -82,6 +82,7 @@ type TeacherAvailabilityData = {
 };
 
 type ClockWindow = { start: number; end: number };
+const MIN_BOOKABLE_LESSON_MINUTES = 30;
 
 const EMPTY_FILTERS: CalendarFilters = {
   teacherId: "",
@@ -281,7 +282,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       .map((event) => ({ start: clockMinutes(timeOnly(eventStart(event))), end: clockMinutes(timeOnly(eventEnd(event))) }))
       .filter((window) => window.end > window.start);
 
-    return { kind: "AVAILABLE" as const, windows: subtractClockWindows(available, busy) };
+    return { kind: "AVAILABLE" as const, windows: subtractClockWindows(available, busy).filter((window) => window.end - window.start >= MIN_BOOKABLE_LESSON_MINUTES) };
   };
 
   const availabilityLine = (d: Date) => {
