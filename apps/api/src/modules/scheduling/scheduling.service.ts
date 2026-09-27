@@ -1787,8 +1787,10 @@ export class SchedulingService {
     const endsAt = new Date(row.ends_at);
     const isActualTeacher = actor.roles.includes("TEACHER") && row.actual_teacher_id === actor.id;
     const canMarkByPermission = actor.permissions.includes("lesson.mark");
-    const withinTeacherWindow = now >= endsAt.getTime() && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
-    const canMark = row.status === "SCHEDULED" && row.funding_status === "PAID" && canMarkByPermission && (privileged || (isActualTeacher && withinTeacherWindow));
+    const markScopeAllowed = privileged || isActualTeacher;
+    const withinTeacherWindow = now >= startsAt.getTime() && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
+    const canShowMark = row.status === "SCHEDULED" && canMarkByPermission && markScopeAllowed;
+    const canMark = canShowMark && row.funding_status === "PAID" && (privileged ? now >= startsAt.getTime() : withinTeacherWindow);
     const canReschedule = row.status === "SCHEDULED" && actor.permissions.includes("lesson.reschedule") && (!actor.roles.includes("PARENT") || startsAt.getTime() - now >= parentRescheduleCutoffMinutes * 60 * 1000);
     const canRescheduleToPast = canReschedule && await this.canRescheduleToPast(actor, row.id);
     const hasRecordedOutcome = row.status === "COMPLETED" || row.status === "CHARGED_NO_SHOW" || Boolean(row.current_incident_type);
@@ -1819,6 +1821,7 @@ export class SchedulingService {
       } : null,
       balanceLessonUnits: row.enrollment_id ? Number(row.balance_credits ?? 0) / 2 : null,
       capabilities: {
+        canShowMark,
         canMark,
         canReschedule,
         canRescheduleToPast,
