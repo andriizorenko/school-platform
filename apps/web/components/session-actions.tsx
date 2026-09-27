@@ -169,6 +169,36 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       setSlotData(null);
       setSelectedSlot("");
       setManualStartsAt("");
+      setRescheduleComment("");
+
+      if (detail.currentIncident?.type === "STUDENT_NO_SHOW") {
+        setRescheduleParty("STUDENT");
+        setRescheduleSituation("LATE");
+        setRescheduleReason("STUDENT_LATE_NO_NOTICE");
+        setRescheduleAfterIncident("student-no-show");
+        setRescheduleStep("slot");
+      } else if (detail.currentIncident?.type === "TEACHER_LATE_CANCELLATION") {
+        setRescheduleParty("TEACHER");
+        setRescheduleSituation("LATE");
+        setRescheduleReason("TEACHER_LATE_CANCELLATION");
+        setTeacherCompensationGranted(detail.currentIncident.outcome === "COMPENSATION_GRANTED");
+        setRescheduleAfterIncident("teacher-late-cancellation");
+        setRescheduleStep("slot");
+      } else if (role === "PARENT") {
+        setRescheduleParty("STUDENT");
+        setRescheduleSituation("ADVANCE");
+        setRescheduleReason("PARENT_REQUEST");
+        setRescheduleAfterIncident(null);
+        setTeacherCompensationGranted(false);
+        setRescheduleStep("slot");
+      } else {
+        setRescheduleParty("");
+        setRescheduleSituation("");
+        setRescheduleReason("PARENT_REQUEST");
+        setRescheduleAfterIncident(null);
+        setTeacherCompensationGranted(false);
+        setRescheduleStep("context");
+      }
     }
     if (next === "substitute") {
       setSubstituteCandidates([]);
@@ -248,6 +278,74 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         paymentMethod: firstLessonPaymentMethod,
       }),
     }));
+  }
+
+  const lateNoticeLabel = detail.lateNoticeCutoffMinutes % 60 === 0
+    ? `${detail.lateNoticeCutoffMinutes / 60} год`
+    : `${detail.lateNoticeCutoffMinutes} хв`;
+
+  function mappedRescheduleReason() {
+    if (rescheduleParty === "STUDENT") {
+      if (rescheduleSituation === "ADVANCE") return "STUDENT_ADVANCE_NOTICE";
+      if (rescheduleSituation === "LATE") return "STUDENT_LATE_NO_NOTICE";
+      if (rescheduleSituation === "TECHNICAL") return "STUDENT_TECHNICAL";
+    }
+    if (rescheduleParty === "TEACHER") {
+      if (rescheduleSituation === "ADVANCE") return "TEACHER_ADVANCE_NOTICE";
+      if (rescheduleSituation === "LATE") return "TEACHER_LATE_CANCELLATION";
+      if (rescheduleSituation === "TECHNICAL") return "TEACHER_TECHNICAL";
+    }
+    if (rescheduleParty === "SCHOOL") {
+      return rescheduleSituation === "OTHER" ? "OTHER" : "SCHOOL_REASON";
+    }
+    return "";
+  }
+
+  async function continueRescheduleContext() {
+    const reason = mappedRescheduleReason();
+    if (!rescheduleParty || !rescheduleSituation || !reason) {
+      setError("Оберіть, хто переносить урок, і причину.");
+      return;
+    }
+
+    setRescheduleReason(reason);
+
+    if (rescheduleSituation !== "LATE" || rescheduleParty === "SCHOOL") {
+      setRescheduleStep("slot");
+      return;
+    }
+
+    if (!detail.capabilities.canReportIncident) {
+      setError(`Пізню відміну можна фіксувати не раніше ніж за ${lateNoticeLabel} до уроку. Якщо повідомили раніше — оберіть «Завчасно попередили».`);
+      return;
+    }
+
+    const kind = rescheduleParty === "STUDENT" ? "student-no-show" : "teacher-late-cancellation";
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<any>(`/sessions/${detail.id}/incidents/${kind}`, {
+        method: "POST",
+        body: JSON.stringify({ comment: rescheduleComment.trim() || undefined }),
+      });
+
+      if (result?.requiresReschedule) {
+        if (kind === "student-no-show") {
+          setRescheduleAfterIncident("student-no-show");
+        } else {
+          setTeacherCompensationGranted(Boolean(result?.compensationGranted));
+          setRescheduleAfterIncident("teacher-late-cancellation");
+        }
+        setRescheduleStep("slot");
+        return;
+      }
+
+      await onSuccess();
+    } catch (exception: any) {
+      setError(exception?.message ?? "Не вдалося зафіксувати причину перенесення");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitReschedule(event: FormEvent) {
