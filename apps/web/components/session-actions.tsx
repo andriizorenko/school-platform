@@ -314,6 +314,11 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     return `${hours} ${unit}`;
   })();
 
+  const studentNoShowAvailableAt = new Date(
+    new Date(detail.startsAt).getTime() + detail.studentNoShowWaitMinutes * 60 * 1000,
+  );
+  const studentNoShowAvailableTime = timeOnly(studentNoShowAvailableAt.toISOString());
+
   const rescheduleParties: Array<{ value: RescheduleParty; label: string }> = [
     { value: "STUDENT", label: "Учень" },
     { value: "TEACHER", label: "Викладач" },
@@ -323,13 +328,13 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     rescheduleParty === "STUDENT"
       ? [
           { value: "ADVANCE", label: "Завчасно попередили", note: `Не пізніше ніж за ${lateNoticeLabel}` },
-          { value: "LATE", label: "Без завчасного попередження", note: `Пізніше ніж за ${lateNoticeLabel} або не попередили`, disabled: !detail.capabilities.canReportIncident },
+          { value: "LATE", label: "Без завчасного попередження", note: `Пізніше ніж за ${lateNoticeLabel} або не попередили`, disabled: !detail.capabilities.canReportStudentNoShow },
           { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо" },
         ]
       : rescheduleParty === "TEACHER"
         ? [
             { value: "ADVANCE", label: "Завчасно попередив", note: `Не пізніше ніж за ${lateNoticeLabel}` },
-            { value: "LATE", label: "Пізнє скасування", note: `Пізніше ніж за ${lateNoticeLabel}`, disabled: !detail.capabilities.canReportIncident },
+            { value: "LATE", label: "Пізнє скасування", note: `Пізніше ніж за ${lateNoticeLabel}`, disabled: !detail.capabilities.canReportTeacherLateCancellation },
             { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо" },
           ]
         : [];
@@ -362,8 +367,12 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       return;
     }
 
-    if (!detail.capabilities.canReportIncident) {
-      setError(`Пізню відміну можна фіксувати не раніше ніж за ${lateNoticeLabel} до уроку. Якщо повідомили раніше — оберіть «Завчасно попередили».`);
+    if (rescheduleParty === "STUDENT" && !detail.capabilities.canReportStudentNoShow) {
+      setError(`Пропуск без завчасного попередження можна зафіксувати після ${studentNoShowAvailableTime} — через ${detail.studentNoShowWaitMinutes} хв після початку уроку.`);
+      return;
+    }
+    if (rescheduleParty === "TEACHER" && !detail.capabilities.canReportTeacherLateCancellation) {
+      setError(`Пізнє скасування викладача можна фіксувати не раніше ніж за ${lateNoticeLabel} до уроку. Якщо повідомили раніше — оберіть «Завчасно попередив».`);
       return;
     }
 
@@ -586,8 +595,11 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
               ))}
             </fieldset>}
 
-            {rescheduleParty && (rescheduleParty === "STUDENT" || rescheduleParty === "TEACHER") && !detail.capabilities.canReportIncident && (
-              <div className="muted form-note">Пізня відміна стане доступною лише всередині вікна {lateNoticeLabel} до уроку. Завчасне або форс-мажорне перенесення можна оформити зараз.</div>
+            {rescheduleParty === "STUDENT" && !detail.capabilities.canReportStudentNoShow && (
+              <div className="muted form-note">Пропуск без завчасного попередження можна зафіксувати після {studentNoShowAvailableTime} — через {detail.studentNoShowWaitMinutes} хв після початку уроку.</div>
+            )}
+            {rescheduleParty === "TEACHER" && !detail.capabilities.canReportTeacherLateCancellation && (
+              <div className="muted form-note">Пізнє скасування викладача стане доступним за {lateNoticeLabel} до уроку. Завчасне або форс-мажорне перенесення можна оформити зараз.</div>
             )}
 
             <div className="field">
