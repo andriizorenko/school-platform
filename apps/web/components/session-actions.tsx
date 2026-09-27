@@ -18,6 +18,7 @@ export type SessionActionDetail = {
   status: string;
   needsReport?: boolean;
   lateNoticeCutoffMinutes: number;
+  studentNoShowWaitMinutes: number;
   currentIncident?: {
     type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
@@ -29,6 +30,8 @@ export type SessionActionDetail = {
     canRescheduleToPast: boolean;
     canUndoOutcome: boolean;
     canReportIncident: boolean;
+    canReportStudentNoShow: boolean;
+    canReportTeacherLateCancellation: boolean;
     canAssignSubstitute: boolean;
   };
 };
