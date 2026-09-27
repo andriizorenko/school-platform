@@ -6,6 +6,7 @@ import { RequirePermissions } from "../iam/require-permissions.decorator";
 import { CompleteFirstLessonDto } from "./dto/complete-first-lesson.dto";
 import { MarkRegularLessonDto } from "./dto/mark-regular-lesson.dto";
 import { ReportLessonIncidentDto } from "./dto/report-lesson-incident.dto";
+import { UndoLessonOutcomeDto } from "./dto/undo-lesson-outcome.dto";
 import { LessonPoliciesService } from "./lesson-policies.service";
 import { LessonsService } from "./lessons.service";
 
@@ -58,6 +59,17 @@ export class LessonsController {
     @RequestId() requestId?: string,
   ) {
     return this.lessons.markRegularLesson(sessionId, dto, user, requestId);
+  }
+
+  @RequirePermissions("lesson.outcome.undo")
+  @Post("sessions/:sessionId/outcome/undo")
+  undoLessonOutcome(
+    @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Body() dto: UndoLessonOutcomeDto,
+    @CurrentUser() user: AuthUser,
+    @RequestId() requestId?: string,
+  ) {
+    return this.policies.undoLessonOutcome(sessionId, dto, user, requestId);
   }
 
   @RequirePermissions("lesson.view")
