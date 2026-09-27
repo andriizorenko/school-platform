@@ -1783,6 +1783,7 @@ export class SchedulingService {
     const teacherMarkDeadlineHours = await numberSchoolSetting(this.db, "teacher_mark_deadline_hours", 48);
     const parentRescheduleCutoffMinutes = await numberSchoolSetting(this.db, "parent_reschedule_cutoff_minutes", 120);
     const lateNoticeCutoffMinutes = await numberSchoolSetting(this.db, "lesson_late_notice_cutoff_minutes", 120);
+    const studentNoShowWaitMinutes = await numberSchoolSetting(this.db, "student_no_show_wait_minutes", 15);
     const startsAt = new Date(row.starts_at);
     const endsAt = new Date(row.ends_at);
     const isActualTeacher = actor.roles.includes("TEACHER") && row.actual_teacher_id === actor.id;
@@ -1796,7 +1797,14 @@ export class SchedulingService {
     const hasRecordedOutcome = row.status === "COMPLETED" || row.status === "CHARGED_NO_SHOW" || Boolean(row.current_incident_type);
     const canUndoByRole = privileged || (isActualTeacher && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000);
     const canUndoOutcome = hasRecordedOutcome && actor.permissions.includes("lesson.outcome.undo") && canUndoByRole;
-    const lateNoticeWindowOpen = now >= startsAt.getTime() - lateNoticeCutoffMinutes * 60 * 1000;
+    const teacherLateWindowOpen = now >= startsAt.getTime() - lateNoticeCutoffMinutes * 60 * 1000;
+    const studentNoShowWindowOpen = now >= startsAt.getTime() + studentNoShowWaitMinutes * 60 * 1000;
+    const canReportIncidentBase = row.status === "SCHEDULED"
+      && row.session_type === "REGULAR"
+      && row.funding_status === "PAID"
+      && !row.current_incident_type
+      && actor.permissions.includes("lesson.incident.record")
+      && (privileged || isActualTeacher);
 
     return {
       id: row.id,
@@ -1815,6 +1823,7 @@ export class SchedulingService {
       homeworkAssigned: row.homework_assigned,
       needsReport: Boolean(row.needs_report),
       lateNoticeCutoffMinutes,
+      studentNoShowWaitMinutes,
       currentIncident: row.current_incident_type ? {
         type: row.current_incident_type,
         outcome: row.current_incident_outcome,
@@ -1826,7 +1835,9 @@ export class SchedulingService {
         canReschedule,
         canRescheduleToPast,
         canUndoOutcome,
-        canReportIncident: row.status === "SCHEDULED" && row.session_type === "REGULAR" && row.funding_status === "PAID" && !row.current_incident_type && lateNoticeWindowOpen && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
+        canReportIncident: canReportIncidentBase && (studentNoShowWindowOpen || teacherLateWindowOpen),
+        canReportStudentNoShow: canReportIncidentBase && studentNoShowWindowOpen,
+        canReportTeacherLateCancellation: canReportIncidentBase && teacherLateWindowOpen,
         canAssignSubstitute: row.status === "SCHEDULED" && privileged,
       },
     };
