@@ -38,6 +38,7 @@ type SessionDetail = {
   topicTitle?: string | null;
   homeworkAssigned?: boolean | null;
   needsReport: boolean;
+  lateNoticeCutoffMinutes: number;
   currentIncident?: {
     type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
