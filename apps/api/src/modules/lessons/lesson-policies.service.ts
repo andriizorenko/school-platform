@@ -24,6 +24,7 @@ import { OutboxService } from "../audit/outbox.service";
 import { FundingMaterializerService } from "../scheduling/funding-materializer.service";
 import type { CompleteFirstLessonDto } from "./dto/complete-first-lesson.dto";
 import type { ReportLessonIncidentDto } from "./dto/report-lesson-incident.dto";
+import type { UndoLessonOutcomeDto } from "./dto/undo-lesson-outcome.dto";
 
 const PRIVILEGED_ROLES = new Set(["ADMIN", "MANAGER", "SUPPORT_MANAGER"]);
 
@@ -381,6 +382,370 @@ export class LessonPoliciesService {
         requiresReschedule: true,
       };
     });
+  }
+
+  async undoLessonOutcome(
+    sessionId: string,
+    dto: UndoLessonOutcomeDto,
+    actor: AuthUser,
+    requestId?: string,
+  ) {
+    const reason = dto.reason.trim();
+    if (!reason) {
+      throw new ConflictException({ code: "LESSON_OUTCOME_UNDO_REASON_REQUIRED", message: "Correction reason is required" });
+    }
+
+    return this.db.transaction(async (tx) => {
+      const session = await this.lockSession(tx, sessionId);
+      const privileged = actor.roles.some((role) => PRIVILEGED_ROLES.has(role));
+      if (!privileged) {
+        const teacherMarkDeadlineHours = await numberSchoolSetting(tx, "teacher_mark_deadline_hours", 48);
+        const teacherDeadline = session.ends_at.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
+        if (!actor.roles.includes("TEACHER") || actor.id !== session.actual_teacher_id || Date.now() > teacherDeadline) {
+          throw new ForbiddenException({
+            code: "LESSON_OUTCOME_UNDO_SCOPE_DENIED",
+            message: "You cannot undo this lesson outcome",
+          });
+        }
+      }
+
+      const incidentResult = await tx.execute(sql`
+        SELECT i.id, i.type, i.outcome, i.policy_strike_number, i.created_at
+        FROM session_incidents i
+        WHERE i.session_id = ${sessionId}
+          AND i.created_at > COALESCE(
+            (SELECT MAX(r.created_at) FROM session_reschedules r WHERE r.session_id = ${sessionId}),
+            '-infinity'::timestamptz
+          )
+        ORDER BY i.created_at DESC
+        LIMIT 1
+        FOR UPDATE
+      `);
+      const incident = incidentResult.rows[0] as {
+        id: string;
+        type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
+        outcome: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
+        policy_strike_number: number;
+        created_at: Date;
+      } | undefined;
+
+      const hasRecordedOutcome =
+        session.status === "COMPLETED" ||
+        session.status === "CHARGED_NO_SHOW" ||
+        Boolean(incident);
+      if (!hasRecordedOutcome) {
+        throw new ConflictException({
+          code: "LESSON_OUTCOME_NOTHING_TO_UNDO",
+          message: "This lesson has no recorded outcome to undo",
+        });
+      }
+
+      if (session.status === "COMPLETED" && session.session_type === "REGULAR") {
+        const completedReport = await tx.execute(sql`
+          SELECT rr.id
+          FROM progress_report_requests rr
+          WHERE rr.target_session_id=${sessionId}
+            AND rr.status='COMPLETED'
+          LIMIT 1
+        `);
+        if (completedReport.rowCount) {
+          throw new ConflictException({
+            code: "LESSON_OUTCOME_HAS_COMPLETED_REPORT",
+            message: "The requested progress report for this lesson is already completed",
+          });
+        }
+      }
+
+      const accrualResult = await tx.execute(sql`
+        SELECT
+          pa.id,
+          EXISTS(SELECT 1 FROM payroll_accrual_settlements pas WHERE pas.accrual_id=pa.id) AS settled,
+          EXISTS(SELECT 1 FROM teacher_payout_items tpi WHERE tpi.accrual_id=pa.id) AS in_payout
+        FROM payroll_accruals pa
+        WHERE pa.session_id=${sessionId}
+        LIMIT 1
+        FOR UPDATE
+      `);
+      const accrual = accrualResult.rows[0] as { id: string; settled: boolean; in_payout: boolean } | undefined;
+      if (accrual?.settled || accrual?.in_payout) {
+        throw new ConflictException({
+          code: "LESSON_OUTCOME_PAYROLL_SETTLED",
+          message: "This lesson is already included in payroll and cannot be undone",
+        });
+      }
+
+      let compensationGrantId: string | null = null;
+      if (incident?.outcome === "COMPENSATION_GRANTED" && session.enrollment_id) {
+        const grantResult = await tx.execute(sql`
+          SELECT g.id
+          FROM lesson_credit_grants g
+          WHERE g.enrollment_id=${session.enrollment_id}
+            AND g.type='TEACHER_COMPENSATION'
+            AND g.restricted_teacher_id=${session.actual_teacher_id}
+            AND g.created_at BETWEEN ${incident.created_at} - interval '10 seconds'
+                                 AND ${incident.created_at} + interval '10 seconds'
+          ORDER BY ABS(EXTRACT(EPOCH FROM (g.created_at - ${incident.created_at}))) ASC
+          LIMIT 1
+          FOR UPDATE
+        `);
+        compensationGrantId = (grantResult.rows[0] as { id: string } | undefined)?.id ?? null;
+        if (!compensationGrantId) {
+          throw new ConflictException({
+            code: "LESSON_OUTCOME_COMPENSATION_NOT_REVERSIBLE",
+            message: "The compensation credit linked to this incident could not be identified safely",
+          });
+        }
+
+        const used = await tx.execute(sql`
+          SELECT 1 FROM lesson_credit_allocations WHERE grant_id=${compensationGrantId} LIMIT 1
+        `);
+        if (used.rowCount) {
+          throw new ConflictException({
+            code: "LESSON_OUTCOME_COMPENSATION_ALREADY_USED",
+            message: "The compensation credit has already been used and this incident cannot be undone",
+          });
+        }
+      }
+
+      const debitResult = await tx.execute(sql`
+        SELECT id, type, credits_debited
+        FROM lesson_credit_debits
+        WHERE session_id=${sessionId}
+          AND type IN ('LESSON_COMPLETED','NO_SHOW_CHARGED')
+        ORDER BY created_at DESC
+        LIMIT 1
+        FOR UPDATE
+      `);
+      const debit = debitResult.rows[0] as { id: string; type: string; credits_debited: number } | undefined;
+
+      const snapshot = JSON.stringify({
+        status: session.status,
+        sessionType: session.session_type,
+        fundingStatus: session.funding_status,
+        incident: incident ? {
+          id: incident.id,
+          type: incident.type,
+          outcome: incident.outcome,
+          policyStrikeNumber: incident.policy_strike_number,
+        } : null,
+        debit: debit ? { id: debit.id, type: debit.type, creditsDebited: Number(debit.credits_debited) } : null,
+        payrollAccrualId: accrual?.id ?? null,
+        compensationGrantId,
+      });
+
+      await tx.execute(sql`
+        INSERT INTO lesson_outcome_corrections (
+          session_id, previous_status, incident_id, incident_type, incident_outcome,
+          reason, before_data, corrected_by
+        )
+        VALUES (
+          ${sessionId},
+          ${session.status}::live_session_status,
+          ${incident?.id ?? null},
+          ${incident?.type ?? null}::session_incident_type,
+          ${incident?.outcome ?? null}::session_incident_outcome,
+          ${reason},
+          ${snapshot}::jsonb,
+          ${actor.id}
+        )
+      `);
+
+      if (debit) {
+        await tx.execute(sql`DELETE FROM lesson_credit_allocations WHERE debit_id=${debit.id}`);
+        await tx.execute(sql`DELETE FROM lesson_credit_debits WHERE id=${debit.id}`);
+      }
+
+      if (accrual) {
+        await tx.execute(sql`DELETE FROM payroll_accruals WHERE id=${accrual.id}`);
+      }
+
+      if (session.session_type === "FIRST" && session.status === "COMPLETED") {
+        await tx.execute(sql`
+          DELETE FROM progress_reports
+          WHERE session_id=${sessionId}
+            AND report_type='INITIAL'
+        `);
+      }
+
+      if (compensationGrantId) {
+        await tx.execute(sql`DELETE FROM lesson_credit_grants WHERE id=${compensationGrantId}`);
+      }
+
+      if (incident) {
+        await tx.execute(sql`DELETE FROM session_incidents WHERE id=${incident.id}`);
+      }
+
+      if (session.status === "COMPLETED" || session.status === "CHARGED_NO_SHOW") {
+        await tx.execute(sql`
+          UPDATE live_sessions
+          SET
+            status='SCHEDULED',
+            topic_title=NULL,
+            homework_assigned=NULL,
+            marked_at=NULL,
+            marked_by=NULL,
+            updated_at=now()
+          WHERE id=${sessionId}
+        `);
+      }
+
+      if (session.enrollment_id && (debit || session.status === "CHARGED_NO_SHOW" || session.status === "COMPLETED")) {
+        await tx.execute(sql`
+          UPDATE session_credit_reservations
+          SET status='ACTIVE', updated_at=now()
+          WHERE session_id=${sessionId}
+            AND status='CONSUMED'
+        `);
+      }
+
+      if (session.enrollment_id) {
+        await this.rebuildStudentAttendancePolicy(tx, session.enrollment_id);
+        await this.rebuildTeacherAttendancePolicy(tx, session.enrollment_id, session.actual_teacher_id);
+      }
+
+      const fundingPlan = session.enrollment_id
+        ? await this.fundingMaterializer.refreshEnrollment(session.enrollment_id, actor.id, tx)
+        : null;
+
+      await this.audit.record(
+        {
+          actorUserId: actor.id,
+          actorRoleCode: actor.roles[0],
+          action: "UNDO_LESSON_OUTCOME",
+          entityType: "LiveSession",
+          entityId: sessionId,
+          requestId,
+          beforeData: JSON.parse(snapshot),
+          afterData: {
+            status: "SCHEDULED",
+            reason,
+            restoredReservation: Boolean(session.enrollment_id),
+            fundingPlan,
+          },
+        },
+        tx,
+      );
+
+      return {
+        ok: true,
+        sessionId,
+        status: "SCHEDULED",
+        reason,
+        fundingPlan,
+      };
+    });
+  }
+
+  private async rebuildStudentAttendancePolicy(tx: any, enrollmentId: string) {
+    const cleanStreakReset = await numberSchoolSetting(tx, "policy_clean_streak_reset", 5);
+    const events = await tx.execute(sql`
+      SELECT event_type, event_at, strike_number
+      FROM (
+        SELECT 'COMPLETED'::text AS event_type, COALESCE(marked_at, updated_at) AS event_at, NULL::int AS strike_number
+        FROM live_sessions
+        WHERE enrollment_id=${enrollmentId}
+          AND session_type='REGULAR'
+          AND status='COMPLETED'
+
+        UNION ALL
+
+        SELECT 'STUDENT_NO_SHOW'::text AS event_type, i.created_at AS event_at, i.policy_strike_number::int AS strike_number
+        FROM session_incidents i
+        JOIN live_sessions s ON s.id=i.session_id
+        WHERE s.enrollment_id=${enrollmentId}
+          AND i.type='STUDENT_NO_SHOW'
+      ) history
+      ORDER BY event_at ASC, event_type ASC
+    `);
+
+    let strike = 0;
+    let clean = 0;
+    for (const row of events.rows as Array<{ event_type: string; strike_number: number | null }>) {
+      if (row.event_type === "STUDENT_NO_SHOW") {
+        if (Number(row.strike_number) === 1) {
+          strike = 1;
+          clean = 0;
+        } else {
+          strike = 0;
+          clean = 0;
+        }
+        continue;
+      }
+      if (strike === 1) {
+        if (clean >= cleanStreakReset - 1) {
+          strike = 0;
+          clean = 0;
+        } else {
+          clean += 1;
+        }
+      } else {
+        clean = 0;
+      }
+    }
+
+    await tx.execute(sql`
+      INSERT INTO student_attendance_policy_states (enrollment_id, strike_count, clean_streak, updated_at)
+      VALUES (${enrollmentId}, ${strike}, ${clean}, now())
+      ON CONFLICT (enrollment_id) DO UPDATE
+      SET strike_count=EXCLUDED.strike_count, clean_streak=EXCLUDED.clean_streak, updated_at=now()
+    `);
+  }
+
+  private async rebuildTeacherAttendancePolicy(tx: any, enrollmentId: string, teacherId: string) {
+    const cleanStreakReset = await numberSchoolSetting(tx, "policy_clean_streak_reset", 5);
+    const events = await tx.execute(sql`
+      SELECT event_type, event_at, strike_number
+      FROM (
+        SELECT 'COMPLETED'::text AS event_type, COALESCE(marked_at, updated_at) AS event_at, NULL::int AS strike_number
+        FROM live_sessions
+        WHERE enrollment_id=${enrollmentId}
+          AND actual_teacher_id=${teacherId}
+          AND session_type='REGULAR'
+          AND status='COMPLETED'
+
+        UNION ALL
+
+        SELECT 'TEACHER_LATE_CANCELLATION'::text AS event_type, i.created_at AS event_at, i.policy_strike_number::int AS strike_number
+        FROM session_incidents i
+        JOIN live_sessions s ON s.id=i.session_id
+        WHERE s.enrollment_id=${enrollmentId}
+          AND i.type='TEACHER_LATE_CANCELLATION'
+          AND i.responsible_teacher_id=${teacherId}
+      ) history
+      ORDER BY event_at ASC, event_type ASC
+    `);
+
+    let strike = 0;
+    let clean = 0;
+    for (const row of events.rows as Array<{ event_type: string; strike_number: number | null }>) {
+      if (row.event_type === "TEACHER_LATE_CANCELLATION") {
+        if (Number(row.strike_number) === 1) {
+          strike = 1;
+          clean = 0;
+        } else {
+          strike = 0;
+          clean = 0;
+        }
+        continue;
+      }
+      if (strike === 1) {
+        if (clean >= cleanStreakReset - 1) {
+          strike = 0;
+          clean = 0;
+        } else {
+          clean += 1;
+        }
+      } else {
+        clean = 0;
+      }
+    }
+
+    await tx.execute(sql`
+      INSERT INTO teacher_student_policy_states (enrollment_id, teacher_id, strike_count, clean_streak, updated_at)
+      VALUES (${enrollmentId}, ${teacherId}, ${strike}, ${clean}, now())
+      ON CONFLICT (enrollment_id, teacher_id) DO UPDATE
+      SET strike_count=EXCLUDED.strike_count, clean_streak=EXCLUDED.clean_streak, updated_at=now()
+    `);
   }
 
   async completeFirstLesson(sessionId: string, dto: CompleteFirstLessonDto, actor: AuthUser, requestId?: string) {
