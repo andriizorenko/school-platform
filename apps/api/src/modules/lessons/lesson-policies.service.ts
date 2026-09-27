@@ -57,9 +57,19 @@ export class LessonPoliciesService {
       this.assertIncidentActor(session, actor);
       await this.assertNoIncidentForCurrentOccurrence(tx, sessionId);
 
-      if (!actor.roles.some((role) => PRIVILEGED_ROLES.has(role))) {
+      const now = Date.now();
+      const lateNoticeCutoffMinutes = await numberSchoolSetting(tx, "lesson_late_notice_cutoff_minutes", 120);
+      const lateWindowStartsAt = session.starts_at.getTime() - lateNoticeCutoffMinutes * 60 * 1000;
+      if (now < lateWindowStartsAt) {
+        throw new ConflictException({
+          code: "STUDENT_LATE_NOTICE_WINDOW_NOT_OPEN",
+          message: `This is still an advance notice. Late/no-notice policy starts ${lateNoticeCutoffMinutes} minutes before lesson start`,
+        });
+      }
+
+      if (!actor.roles.some((role) => PRIVILEGED_ROLES.has(role)) && now >= session.starts_at.getTime()) {
         const noShowWaitMinutes = await numberSchoolSetting(tx, "student_no_show_wait_minutes", 15);
-        if (Date.now() < session.starts_at.getTime() + noShowWaitMinutes * 60 * 1000) {
+        if (now < session.starts_at.getTime() + noShowWaitMinutes * 60 * 1000) {
           throw new ConflictException({
             code: "NO_SHOW_WAIT_PERIOD_ACTIVE",
             message: `Teacher must wait ${noShowWaitMinutes} minutes after lesson start before recording a student no-show`,
@@ -252,6 +262,25 @@ export class LessonPoliciesService {
       this.assertRegularPaidSession(session);
       this.assertIncidentActor(session, actor);
       await this.assertNoIncidentForCurrentOccurrence(tx, sessionId);
+
+      const now = Date.now();
+      const lateNoticeCutoffMinutes = await numberSchoolSetting(tx, "lesson_late_notice_cutoff_minutes", 120);
+      if (now < session.starts_at.getTime() - lateNoticeCutoffMinutes * 60 * 1000) {
+        throw new ConflictException({
+          code: "TEACHER_LATE_CANCELLATION_WINDOW_NOT_OPEN",
+          message: `This is still an advance notice. Late-cancellation policy starts ${lateNoticeCutoffMinutes} minutes before lesson start`,
+        });
+      }
+
+      if (!actor.roles.some((role) => PRIVILEGED_ROLES.has(role))) {
+        const teacherMarkDeadlineHours = await numberSchoolSetting(tx, "teacher_mark_deadline_hours", 48);
+        if (now > session.ends_at.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000) {
+          throw new ForbiddenException({
+            code: "TEACHER_LATE_CANCELLATION_WINDOW_EXPIRED",
+            message: "The late-cancellation window for this lesson has expired",
+          });
+        }
+      }
 
       const stateResult = await tx.execute(sql`
         SELECT strike_count, clean_streak
