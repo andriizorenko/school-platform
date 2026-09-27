@@ -34,8 +34,8 @@ export type SessionActionDetail = {
 };
 
 type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "undo-outcome" | null;
-type RescheduleParty = "STUDENT" | "TEACHER" | "SCHOOL";
-type RescheduleSituation = "ADVANCE" | "LATE" | "TECHNICAL" | "SCHOOL" | "OTHER";
+type RescheduleParty = "STUDENT" | "TEACHER";
+type RescheduleSituation = "ADVANCE" | "LATE" | "TECHNICAL";
 type RescheduleStep = "context" | "slot";
 
 type FreeSlot = { startsAt: string; endsAt: string; date: string; time: string };
@@ -298,37 +298,38 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     }));
   }
 
-  const lateNoticeLabel = detail.lateNoticeCutoffMinutes % 60 === 0
-    ? `${detail.lateNoticeCutoffMinutes / 60} год`
-    : `${detail.lateNoticeCutoffMinutes} хв`;
+  const lateNoticeLabel = (() => {
+    if (detail.lateNoticeCutoffMinutes % 60 !== 0) return `${detail.lateNoticeCutoffMinutes} хв`;
+    const hours = detail.lateNoticeCutoffMinutes / 60;
+    const mod10 = hours % 10;
+    const mod100 = hours % 100;
+    const unit = mod10 === 1 && mod100 !== 11
+      ? "годину"
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? "години"
+        : "годин";
+    return `${hours} ${unit}`;
+  })();
 
-  const rescheduleParties: Array<{ value: RescheduleParty; label: string; note: string }> = [
-    { value: "STUDENT", label: "Учень", note: "Перенесення з боку учня або батьків" },
-    { value: "TEACHER", label: "Викладач", note: "Перенесення з боку викладача" },
+  const rescheduleParties: Array<{ value: RescheduleParty; label: string }> = [
+    { value: "STUDENT", label: "Учень" },
+    { value: "TEACHER", label: "Викладач" },
   ];
-  if (role === "ADMIN" || role === "MANAGER") {
-    rescheduleParties.push({ value: "SCHOOL", label: "Школа / інше", note: "Організаційна або службова причина" });
-  }
 
   const rescheduleSituations: Array<{ value: RescheduleSituation; label: string; note: string; disabled?: boolean }> =
     rescheduleParty === "STUDENT"
       ? [
-          { value: "ADVANCE", label: "Завчасно попередили", note: `Не пізніше ніж за ${lateNoticeLabel} до уроку · без strike` },
-          { value: "LATE", label: "Без завчасного попередження", note: `Пізніше ніж за ${lateNoticeLabel} або не попередили · діє правило пропусків`, disabled: !detail.capabilities.canReportIncident },
-          { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо · без strike" },
+          { value: "ADVANCE", label: "Завчасно попередили", note: `Не пізніше ніж за ${lateNoticeLabel}` },
+          { value: "LATE", label: "Без завчасного попередження", note: `Пізніше ніж за ${lateNoticeLabel} або не попередили`, disabled: !detail.capabilities.canReportIncident },
+          { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо" },
         ]
       : rescheduleParty === "TEACHER"
         ? [
-            { value: "ADVANCE", label: "Завчасно попередив", note: `Не пізніше ніж за ${lateNoticeLabel} до уроку · без strike` },
-            { value: "LATE", label: "Пізнє скасування", note: `Пізніше ніж за ${lateNoticeLabel} · діє правило пізніх скасувань`, disabled: !detail.capabilities.canReportIncident },
-            { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо · без strike" },
+            { value: "ADVANCE", label: "Завчасно попередив", note: `Не пізніше ніж за ${lateNoticeLabel}` },
+            { value: "LATE", label: "Пізнє скасування", note: `Пізніше ніж за ${lateNoticeLabel}`, disabled: !detail.capabilities.canReportIncident },
+            { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо" },
           ]
-        : rescheduleParty === "SCHOOL"
-          ? [
-              { value: "SCHOOL", label: "Організаційна причина", note: "Перенесення з боку школи · без strike" },
-              { value: "OTHER", label: "Інша причина", note: "Службовий випадок, який не підпадає під інші категорії" },
-            ]
-          : [];
+        : [];
 
   function mappedRescheduleReason() {
     if (rescheduleParty === "STUDENT") {
@@ -340,9 +341,6 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       if (rescheduleSituation === "ADVANCE") return "TEACHER_ADVANCE_NOTICE";
       if (rescheduleSituation === "LATE") return "TEACHER_LATE_CANCELLATION";
       if (rescheduleSituation === "TECHNICAL") return "TEACHER_TECHNICAL";
-    }
-    if (rescheduleParty === "SCHOOL") {
-      return rescheduleSituation === "OTHER" ? "OTHER" : "SCHOOL_REASON";
     }
     return "";
   }
@@ -356,7 +354,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
     setRescheduleReason(reason);
 
-    if (rescheduleSituation !== "LATE" || rescheduleParty === "SCHOOL") {
+    if (rescheduleSituation !== "LATE") {
       setRescheduleStep("slot");
       return;
     }
@@ -561,7 +559,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
                       setError("");
                     }}
                   />
-                  <span><strong>{party.label}</strong><span className="muted" style={{display:"block",fontSize:12,marginTop:3}}>{party.note}</span></span>
+                  <strong>{party.label}</strong>
                 </label>
               ))}
             </fieldset>
@@ -604,7 +602,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
             {!rescheduleAfterIncident && role !== "PARENT" && (
               <div className="notice-card">
-                <strong>{rescheduleParty === "STUDENT" ? "Учень" : rescheduleParty === "TEACHER" ? "Викладач" : "Школа"} · {rescheduleSituations.find((item) => item.value === rescheduleSituation)?.label ?? "Перенесення"}</strong>
+                <strong>{rescheduleParty === "STUDENT" ? "Учень" : "Викладач"} · {rescheduleSituations.find((item) => item.value === rescheduleSituation)?.label ?? "Перенесення"}</strong>
                 <div className="muted" style={{marginTop:6}}>Якщо причина обрана помилково, поверніться назад і змініть її до підтвердження перенесення.</div>
                 <button type="button" className="link-button" style={{marginTop:8}} onClick={() => { setRescheduleStep("context"); setSelectedSlot(""); setSlotData(null); }}>← Змінити причину</button>
               </div>
