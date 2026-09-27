@@ -44,7 +44,7 @@ type SessionDetail = {
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
   } | null;
   balanceLessonUnits?: number | null;
-  capabilities: { canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canUndoOutcome: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
+  capabilities: { canShowMark: boolean; canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canUndoOutcome: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
 };
 
 type FilterOptions = {
