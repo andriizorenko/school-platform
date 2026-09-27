@@ -1700,6 +1700,28 @@ export class SchedulingService {
           WHERE rr.target_session_id = ls.id AND rr.status = 'PENDING'
         ) AS needs_report,
         (
+          SELECT i.type
+          FROM session_incidents i
+          WHERE i.session_id=ls.id
+            AND i.created_at > COALESCE(
+              (SELECT MAX(r.created_at) FROM session_reschedules r WHERE r.session_id=ls.id),
+              '-infinity'::timestamptz
+            )
+          ORDER BY i.created_at DESC
+          LIMIT 1
+        ) AS current_incident_type,
+        (
+          SELECT i.outcome
+          FROM session_incidents i
+          WHERE i.session_id=ls.id
+            AND i.created_at > COALESCE(
+              (SELECT MAX(r.created_at) FROM session_reschedules r WHERE r.session_id=ls.id),
+              '-infinity'::timestamptz
+            )
+          ORDER BY i.created_at DESC
+          LIMIT 1
+        ) AS current_incident_outcome,
+        (
           COALESCE((SELECT SUM(g.credits_granted) FROM lesson_credit_grants g WHERE g.enrollment_id = ls.enrollment_id), 0)
           - COALESCE((SELECT SUM(d.credits_debited) FROM lesson_credit_debits d WHERE d.enrollment_id = ls.enrollment_id), 0)
         )::int AS balance_credits
@@ -1733,6 +1755,9 @@ export class SchedulingService {
     const canMark = row.status === "SCHEDULED" && row.funding_status === "PAID" && canMarkByPermission && (privileged || (isActualTeacher && withinTeacherWindow));
     const canReschedule = row.status === "SCHEDULED" && actor.permissions.includes("lesson.reschedule") && (!actor.roles.includes("PARENT") || startsAt.getTime() - now >= parentRescheduleCutoffMinutes * 60 * 1000);
     const canRescheduleToPast = canReschedule && await this.canRescheduleToPast(actor, row.id);
+    const hasRecordedOutcome = row.status === "COMPLETED" || row.status === "CHARGED_NO_SHOW" || Boolean(row.current_incident_type);
+    const canUndoByRole = privileged || (isActualTeacher && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000);
+    const canUndoOutcome = hasRecordedOutcome && actor.permissions.includes("lesson.outcome.undo") && canUndoByRole;
 
     return {
       id: row.id,
@@ -1750,11 +1775,16 @@ export class SchedulingService {
       topicTitle: row.topic_title,
       homeworkAssigned: row.homework_assigned,
       needsReport: Boolean(row.needs_report),
+      currentIncident: row.current_incident_type ? {
+        type: row.current_incident_type,
+        outcome: row.current_incident_outcome,
+      } : null,
       balanceLessonUnits: row.enrollment_id ? Number(row.balance_credits ?? 0) / 2 : null,
       capabilities: {
         canMark,
         canReschedule,
         canRescheduleToPast,
+        canUndoOutcome,
         canReportIncident: row.status === "SCHEDULED" && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
         canAssignSubstitute: row.status === "SCHEDULED" && privileged,
       },
