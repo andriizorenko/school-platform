@@ -9,6 +9,13 @@ const errorMessages: Record<string, string> = {
   PAST_RESCHEDULE_REQUIRES_MANUAL_MODE: "Перенесення в минуле доступне лише через адміністративний ручний режим.",
   PAST_RESCHEDULE_MUST_END_IN_PAST: "Оберіть час так, щоб урок повністю завершився до поточного моменту.",
   PAST_RESCHEDULE_COMMENT_REQUIRED: "Для перенесення уроку в минуле обовʼязково вкажіть коментар.",
+  LESSON_OUTCOME_UNDO_REASON_REQUIRED: "Вкажіть причину скасування відмітки.",
+  LESSON_OUTCOME_NOTHING_TO_UNDO: "Для цього уроку немає відмітки, яку можна скасувати.",
+  LESSON_OUTCOME_UNDO_SCOPE_DENIED: "Немає права скасувати цю відмітку уроку.",
+  LESSON_OUTCOME_HAS_COMPLETED_REPORT: "За цим уроком уже завершено звіт для батьків. Спочатку потрібно окремо виправити звіт.",
+  LESSON_OUTCOME_PAYROLL_SETTLED: "Урок уже включено до зарплатного періоду. Автоматичне скасування недоступне.",
+  LESSON_OUTCOME_COMPENSATION_NOT_REVERSIBLE: "Не вдалося безпечно визначити компенсацію, повʼязану з цією відміткою.",
+  LESSON_OUTCOME_COMPENSATION_ALREADY_USED: "Компенсаційне заняття вже використано, тому цю відмітку не можна скасувати автоматично.",
 };
 
 export class ApiError extends Error {
