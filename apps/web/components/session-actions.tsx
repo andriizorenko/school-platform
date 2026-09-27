@@ -437,8 +437,8 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     }));
   }
 
-  async function moveToPast() {
-    if (!manualStartsAt) { setError("Вкажіть дату та час у минулому."); return; }
+  async function submitAdminReschedule() {
+    if (!manualStartsAt) { setError("Вкажіть нову дату та час."); return; }
     if (!rescheduleComment.trim()) { setError("Для перенесення в минуле обовʼязково вкажіть причину в коментарі."); return; }
     const startsAt = new Date(manualStartsAt);
     if (Number.isNaN(startsAt.getTime())) { setError("Вкажіть коректну дату та час."); return; }
@@ -660,15 +660,15 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
   if (action === "admin-reschedule") {
     return (
-      <form className="stack session-action-form" onSubmit={(event) => { event.preventDefault(); void moveToPast(); }}>
+      <form className="stack session-action-form" onSubmit={(event) => { event.preventDefault(); void submitAdminReschedule(); }}>
         <div className="row action-form-head">
           <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
           <strong>Адміністративне перенесення</strong>
         </div>
 
         <div className="notice-card">
-          <strong>Історичне виправлення дати уроку.</strong>
-          <div className="muted" style={{marginTop:6}}>Увесь урок має вже завершитися на новому часі. Дія фіксується в аудиті.</div>
+          <strong>Ручне перенесення без часових обмежень.</strong>
+          <div className="muted" style={{marginTop:6}}>Можна вибрати минулий, поточний або майбутній час. Доступність викладача та конфлікти з іншими заняттями все одно перевіряються. Дія фіксується в аудиті.</div>
         </div>
 
         <div className="field">
