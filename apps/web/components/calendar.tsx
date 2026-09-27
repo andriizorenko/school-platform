@@ -38,8 +38,12 @@ type SessionDetail = {
   topicTitle?: string | null;
   homeworkAssigned?: boolean | null;
   needsReport: boolean;
+  currentIncident?: {
+    type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
+    outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
+  } | null;
   balanceLessonUnits?: number | null;
-  capabilities: { canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
+  capabilities: { canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canUndoOutcome: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
 };
 
 type FilterOptions = {
