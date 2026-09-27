@@ -17,6 +17,7 @@ export type SessionActionDetail = {
   startsAt: string;
   status: string;
   needsReport?: boolean;
+  lateNoticeCutoffMinutes: number;
   currentIncident?: {
     type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
@@ -31,7 +32,10 @@ export type SessionActionDetail = {
   };
 };
 
-type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "student-no-show" | "teacher-late-cancellation" | "undo-outcome" | null;
+type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "undo-outcome" | null;
+type RescheduleParty = "STUDENT" | "TEACHER" | "SCHOOL";
+type RescheduleSituation = "ADVANCE" | "LATE" | "TECHNICAL" | "SCHOOL" | "OTHER";
+type RescheduleStep = "context" | "slot";
 
 type FreeSlot = { startsAt: string; endsAt: string; date: string; time: string };
 type FreeSlotsResponse = {
@@ -67,48 +71,6 @@ type Props = {
   onReportReminder?: (studentId: string) => void;
 };
 
-function RescheduleReasonFields({
-  role,
-  value,
-  onChange,
-}: {
-  role: SessionActionRole;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  if (role === "PARENT") {
-    return <input type="hidden" value="PARENT_REQUEST" readOnly />;
-  }
-
-  const options = role === "TEACHER"
-    ? [
-        ["TEACHER_TECHNICAL", "Технічна проблема / звʼязок"],
-        ["TEACHER_PERSONAL", "Особиста причина"],
-        ["OTHER", "Інша причина"],
-      ]
-    : [
-        ["PARENT_REQUEST", "Запит батьків"],
-        ["STUDENT_CANNOT_ATTEND", "Учень не може бути присутнім"],
-        ["TEACHER_TECHNICAL", "Технічна проблема викладача"],
-        ["TEACHER_PERSONAL", "Особиста причина викладача"],
-        ["TEACHER_VACATION", "Відпустка викладача"],
-        ["STUDENT_PAUSE", "Пауза / канікули учня"],
-        ["SCHOOL_REASON", "Причина школи"],
-        ["OTHER", "Інша причина"],
-      ];
-
-  return (
-    <div className="field">
-      <label>Причина</label>
-      <select className="select" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map(([optionValue, label]) => (
-          <option key={optionValue} value={optionValue}>{label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 export function SessionActions({ role, detail, onSuccess, onReportReminder }: Props) {
   const [action, setAction] = useState<Action>(null);
   const [busy, setBusy] = useState(false);
@@ -120,16 +82,16 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   const [gaps, setGaps] = useState("");
   const [actionPlan, setActionPlan] = useState("");
 
-  const [rescheduleReason, setRescheduleReason] = useState(
-    role === "PARENT" ? "PARENT_REQUEST" : role === "TEACHER" ? "TEACHER_PERSONAL" : "PARENT_REQUEST",
-  );
+  const [rescheduleReason, setRescheduleReason] = useState("PARENT_REQUEST");
+  const [rescheduleStep, setRescheduleStep] = useState<RescheduleStep>("context");
+  const [rescheduleParty, setRescheduleParty] = useState<RescheduleParty | "">("");
+  const [rescheduleSituation, setRescheduleSituation] = useState<RescheduleSituation | "">("");
   const [rescheduleComment, setRescheduleComment] = useState("");
   const [slotDays, setSlotDays] = useState(14);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
   const [manualStartsAt, setManualStartsAt] = useState("");
-  const [incidentComment, setIncidentComment] = useState("");
   const [rescheduleAfterIncident, setRescheduleAfterIncident] = useState<null | "student-no-show" | "teacher-late-cancellation">(null);
   const [teacherCompensationGranted, setTeacherCompensationGranted] = useState(false);
   const [firstLessonAmount, setFirstLessonAmount] = useState("");
@@ -156,7 +118,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   }, [slotData]);
 
   useEffect(() => {
-    if (action !== "reschedule") return;
+    if (action !== "reschedule" || rescheduleStep !== "slot") return;
     setSlotsLoading(true);
     setError("");
     setSelectedSlot("");
@@ -167,7 +129,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         setError(exception?.message ?? "Не вдалося завантажити вільні години");
       })
       .finally(() => setSlotsLoading(false));
-  }, [action, detail.id, slotDays]);
+  }, [action, detail.id, rescheduleStep, slotDays]);
 
   useEffect(() => {
     if (action !== "first-payment") return;
