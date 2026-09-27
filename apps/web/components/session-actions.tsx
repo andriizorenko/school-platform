@@ -15,6 +15,7 @@ export type SessionActionDetail = {
   sessionType: "FIRST" | "REGULAR";
   fundingStatus: "PAID" | "BOOKED";
   startsAt: string;
+  needsReport?: boolean;
   capabilities: {
     canMark: boolean;
     canReschedule: boolean;
@@ -57,6 +58,7 @@ type Props = {
   role: SessionActionRole;
   detail: SessionActionDetail;
   onSuccess: () => Promise<void> | void;
+  onReportReminder?: (studentId: string) => void;
 };
 
 function RescheduleReasonFields({
@@ -101,7 +103,7 @@ function RescheduleReasonFields({
   );
 }
 
-export function SessionActions({ role, detail, onSuccess }: Props) {
+export function SessionActions({ role, detail, onSuccess, onReportReminder }: Props) {
   const [action, setAction] = useState<Action>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -237,13 +239,27 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
     }
 
     if (!topicTitle.trim() || homeworkAssigned === null) return;
-    await finish(() => api(`/sessions/${detail.id}/mark`, {
-      method: "POST",
-      body: JSON.stringify({
-        topicTitle: topicTitle.trim(),
-        homeworkAssigned,
-      }),
-    }));
+
+    setBusy(true);
+    setError("");
+    try {
+      await api(`/sessions/${detail.id}/mark`, {
+        method: "POST",
+        body: JSON.stringify({
+          topicTitle: topicTitle.trim(),
+          homeworkAssigned,
+        }),
+      });
+
+      if (role === "TEACHER" && detail.needsReport) {
+        onReportReminder?.(detail.student.id);
+      }
+      await onSuccess();
+    } catch (exception: any) {
+      setError(exception?.message ?? "Не вдалося виконати дію");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitFirstPayment(event: FormEvent) {
