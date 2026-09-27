@@ -1276,6 +1276,29 @@ export class SchedulingService {
 
         await this.assertCanRescheduleSession(tx, session, actor);
 
+        if (dto.reason === "STUDENT_LATE_NO_NOTICE" || dto.reason === "TEACHER_LATE_CANCELLATION") {
+          const expectedIncidentType = dto.reason === "STUDENT_LATE_NO_NOTICE"
+            ? "STUDENT_NO_SHOW"
+            : "TEACHER_LATE_CANCELLATION";
+          const incidentResult = await tx.execute(sql`
+            SELECT 1
+            FROM session_incidents i
+            WHERE i.session_id = ${sessionId}
+              AND i.type = ${expectedIncidentType}::session_incident_type
+              AND i.created_at > COALESCE(
+                (SELECT MAX(r.created_at) FROM session_reschedules r WHERE r.session_id = ${sessionId}),
+                '-infinity'::timestamptz
+              )
+            LIMIT 1
+          `);
+          if (!incidentResult.rowCount) {
+            throw new ConflictException({
+              code: "RESCHEDULE_LATE_REASON_REQUIRES_INCIDENT",
+              message: "Late/no-notice rescheduling requires the attendance policy event to be recorded first",
+            });
+          }
+        }
+
         let requestedStart: Date;
         let consumedPlaceholderId: string | null = null;
 
