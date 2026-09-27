@@ -18,6 +18,7 @@ export type SessionActionDetail = {
   capabilities: {
     canMark: boolean;
     canReschedule: boolean;
+    canRescheduleToPast: boolean;
     canReportIncident: boolean;
     canAssignSubstitute: boolean;
   };
@@ -119,6 +120,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [manualStartsAt, setManualStartsAt] = useState("");
   const [incidentComment, setIncidentComment] = useState("");
   const [rescheduleAfterIncident, setRescheduleAfterIncident] = useState<null | "student-no-show" | "teacher-late-cancellation">(null);
   const [teacherCompensationGranted, setTeacherCompensationGranted] = useState(false);
@@ -195,6 +197,7 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
       setSlotDays(14);
       setSlotData(null);
       setSelectedSlot("");
+      setManualStartsAt("");
     }
     if (next === "substitute") {
       setSubstituteCandidates([]);
@@ -284,6 +287,23 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
         reason: role === "PARENT" ? "PARENT_REQUEST" : rescheduleReason,
         mode: "END_OF_PAID_SEQUENCE",
         comment: rescheduleComment.trim() || undefined,
+      }),
+    }));
+  }
+
+  async function moveToPast() {
+    if (!manualStartsAt) { setError("Вкажіть дату та час у минулому."); return; }
+    if (!rescheduleComment.trim()) { setError("Для перенесення в минуле обовʼязково вкажіть причину в коментарі."); return; }
+    const startsAt = new Date(manualStartsAt);
+    if (Number.isNaN(startsAt.getTime())) { setError("Вкажіть коректну дату та час."); return; }
+
+    await finish(() => api(`/sessions/${detail.id}/reschedule`, {
+      method: "POST",
+      body: JSON.stringify({
+        startsAt: startsAt.toISOString(),
+        reason: rescheduleReason,
+        mode: "MANUAL",
+        comment: rescheduleComment.trim(),
       }),
     }));
   }
@@ -412,7 +432,16 @@ export function SessionActions({ role, detail, onSuccess }: Props) {
 
         {slotDays === 14 && <button type="button" className="btn secondary" disabled={slotsLoading} onClick={()=>setSlotDays(28)}>Показати вільні години на 28 днів</button>}
 
-        <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder="Необовʼязково" /></div>
+        <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder={detail.capabilities.canRescheduleToPast ? "Для перенесення в минуле — обовʼязково" : "Необовʼязково"} /></div>
+
+        {detail.capabilities.canRescheduleToPast && !rescheduleAfterIncident && (
+          <div className="notice-card stack">
+            <div><strong>Адміністративне перенесення в минуле</strong><div className="muted" style={{marginTop:6}}>Для виправлення історичної дати уроку. Увесь урок має вже завершитися, а дія фіксується в аудиті.</div></div>
+            <div className="field"><label>Нова дата й час початку</label><input className="input" type="datetime-local" value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} /></div>
+            <button type="button" className="btn secondary" disabled={busy || !manualStartsAt || !rescheduleComment.trim()} onClick={()=>void moveToPast()}>{busy ? "Переносимо…" : "Перенести в минуле"}</button>
+          </div>
+        )}
+
         <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
         {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
         {error && <div className="error">{error}</div>}

@@ -42,6 +42,7 @@ import {
 import type { AuthUser } from "../auth/types";
 import { AuditService } from "../audit/audit.service";
 import { OutboxService } from "../audit/outbox.service";
+import { IamService } from "../iam/iam.service";
 import type { CreateFirstLessonDto } from "./dto/create-first-lesson.dto";
 import type { RescheduleSessionDto } from "./dto/reschedule-session.dto";
 import type { FreeSlotsQueryDto } from "./dto/free-slots-query.dto";
@@ -70,7 +71,19 @@ export class SchedulingService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly fundingMaterializer: FundingMaterializerService,
+    private readonly iam: IamService,
   ) {}
+
+  private async canRescheduleToPast(actor: AuthUser, sessionId: string) {
+    if (actor.roles.includes("ADMIN")) return true;
+    if (!actor.roles.includes("MANAGER")) return false;
+    if (actor.permissions.includes("lesson.reschedule.past")) return true;
+    const [globalGrant, sessionGrant] = await Promise.all([
+      this.iam.hasTemporaryPermission(actor.id, "lesson.reschedule.past", "GLOBAL"),
+      this.iam.hasTemporaryPermission(actor.id, "lesson.reschedule.past", "SESSION", sessionId),
+    ]);
+    return globalGrant || sessionGrant;
+  }
 
   private validateRegularSlots(dto: SetRegularScheduleDto) {
     const byDay = new Map<number, Array<{ start: number; end: number }>>();
@@ -1272,22 +1285,34 @@ export class SchedulingService {
           consumedPlaceholderId = target.placeholderId;
         } else {
           if (!dto.startsAt) {
-            throw new BadRequestException({
-              code: "RESCHEDULE_TIME_REQUIRED",
-              message: "Choose a new lesson time",
-            });
+            throw new BadRequestException({ code: "RESCHEDULE_TIME_REQUIRED", message: "Choose a new lesson time" });
           }
           requestedStart = new Date(dto.startsAt);
-          if (Number.isNaN(requestedStart.getTime()) || requestedStart.getTime() <= Date.now()) {
-            throw new BadRequestException({
-              code: "INVALID_RESCHEDULE_TIME",
-              message: "The new lesson time must be in the future",
-            });
+          if (Number.isNaN(requestedStart.getTime())) {
+            throw new BadRequestException({ code: "INVALID_RESCHEDULE_TIME", message: "Invalid lesson time" });
           }
         }
 
         const durationMinutes = Math.round((session.ends_at.getTime() - session.starts_at.getTime()) / 60_000);
         const requestedEnd = addMinutes(requestedStart, durationMinutes);
+        const now = new Date();
+        const isPastReschedule = requestedStart.getTime() <= now.getTime();
+
+        if (isPastReschedule) {
+          if (dto.mode !== "MANUAL") {
+            throw new BadRequestException({ code: "PAST_RESCHEDULE_REQUIRES_MANUAL_MODE", message: "Historical lesson time can only be set manually" });
+          }
+          if (!(await this.canRescheduleToPast(actor, sessionId))) {
+            throw new ForbiddenException({ code: "PAST_RESCHEDULE_PERMISSION_REQUIRED", message: "You do not have permission to move lessons into the past" });
+          }
+          if (requestedEnd.getTime() > now.getTime()) {
+            throw new BadRequestException({ code: "PAST_RESCHEDULE_MUST_END_IN_PAST", message: "The entire lesson must end before the current time" });
+          }
+          if (!dto.comment?.trim()) {
+            throw new BadRequestException({ code: "PAST_RESCHEDULE_COMMENT_REQUIRED", message: "Add a comment explaining the historical correction" });
+          }
+        }
+
         const local = formatInSchoolTimeZone(requestedStart);
         const availability = await this.loadAvailabilitySnapshot(tx, session.actual_teacher_id, local.date, local.date);
         if (!this.isTeacherAvailable(availability, local.date, isoDayOfWeek(local.date), local.time, durationMinutes)) {
@@ -1339,6 +1364,7 @@ export class SchedulingService {
               reason: dto.reason,
               mode: dto.mode,
               consumedPlaceholderId,
+              pastReschedule: isPastReschedule,
             },
           },
           tx,
@@ -1706,6 +1732,7 @@ export class SchedulingService {
     const withinTeacherWindow = now >= endsAt.getTime() && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
     const canMark = row.status === "SCHEDULED" && row.funding_status === "PAID" && canMarkByPermission && (privileged || (isActualTeacher && withinTeacherWindow));
     const canReschedule = row.status === "SCHEDULED" && actor.permissions.includes("lesson.reschedule") && (!actor.roles.includes("PARENT") || startsAt.getTime() - now >= parentRescheduleCutoffMinutes * 60 * 1000);
+    const canRescheduleToPast = canReschedule && await this.canRescheduleToPast(actor, row.id);
 
     return {
       id: row.id,
@@ -1727,6 +1754,7 @@ export class SchedulingService {
       capabilities: {
         canMark,
         canReschedule,
+        canRescheduleToPast,
         canReportIncident: row.status === "SCHEDULED" && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
         canAssignSubstitute: row.status === "SCHEDULED" && privileged,
       },

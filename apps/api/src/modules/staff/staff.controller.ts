@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Put, Query } from "@nestjs/common";
 import { RequestId } from "../../common/request-id.decorator";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { AuthUser } from "../auth/types";
@@ -6,6 +6,7 @@ import { RequirePermissions } from "../iam/require-permissions.decorator";
 import { ChangeStaffRoleDto } from "./dto/change-staff-role.dto";
 import { CreateStaffDto } from "./dto/create-staff.dto";
 import { UpdateStaffDto } from "./dto/update-staff.dto";
+import { UpdatePastRescheduleAccessDto } from "./dto/update-past-reschedule-access.dto";
 import { StaffService } from "./staff.service";
 
 @Controller("staff")
@@ -28,6 +29,23 @@ export class StaffController {
   @Get("managers")
   listManagers() {
     return this.staff.listManagers();
+  }
+
+  @RequirePermissions("roles.manage")
+  @Get(":userId/past-reschedule-access")
+  getPastRescheduleAccess(@Param("userId", ParseUUIDPipe) userId: string) {
+    return this.staff.getPastRescheduleAccess(userId);
+  }
+
+  @RequirePermissions("roles.manage")
+  @Put(":userId/past-reschedule-access")
+  setPastRescheduleAccess(
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() dto: UpdatePastRescheduleAccessDto,
+    @CurrentUser() user: AuthUser,
+    @RequestId() requestId?: string,
+  ) {
+    return this.staff.setPastRescheduleAccess(userId, dto, user, requestId);
   }
 
   @RequirePermissions("staff.view")

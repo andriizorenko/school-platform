@@ -1,5 +1,5 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { roles, staffProfiles, userRoles, users } from "@school/db";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { permissions, roles, staffProfiles, temporaryPermissionGrants, userRoles, users } from "@school/db";
 import type { Database } from "@school/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database/database.constants";
@@ -9,8 +9,10 @@ import { AuditService } from "../audit/audit.service";
 import type { ChangeStaffRoleDto } from "./dto/change-staff-role.dto";
 import type { CreateStaffDto } from "./dto/create-staff.dto";
 import type { UpdateStaffDto } from "./dto/update-staff.dto";
+import type { UpdatePastRescheduleAccessDto } from "./dto/update-past-reschedule-access.dto";
 
 const operationalStaffRoles = ["MANAGER", "FINANCIER", "SUPPORT_MANAGER"] as const;
+const PAST_RESCHEDULE_PERMISSION = "lesson.reschedule.past";
 
 @Injectable()
 export class StaffService {
@@ -206,6 +208,98 @@ export class StaffService {
       activeManagedStudents: Number((managedStudents.rows[0] as any)?.count ?? 0),
       latestInvitation: invite.rows[0] ?? null,
     };
+  }
+
+
+  async getPastRescheduleAccess(userId: string) {
+    const staff = await this.getById(userId);
+    if (!staff.roles.includes("MANAGER")) {
+      return { eligible: false, enabled: false, startsAt: null, expiresAt: null };
+    }
+    const result = await this.db.execute(sql`
+      SELECT tpg.starts_at, tpg.expires_at
+      FROM temporary_permission_grants tpg
+      JOIN permissions p ON p.id=tpg.permission_id
+      WHERE tpg.user_id=${userId}
+        AND p.code=${PAST_RESCHEDULE_PERMISSION}
+        AND tpg.scope_type='GLOBAL'
+        AND tpg.scope_id IS NULL
+        AND tpg.starts_at <= now()
+        AND tpg.expires_at > now()
+        AND tpg.revoked_at IS NULL
+      ORDER BY tpg.expires_at DESC
+      LIMIT 1
+    `);
+    const grant = result.rows[0] as { starts_at: Date; expires_at: Date } | undefined;
+    return { eligible: true, enabled: Boolean(grant), startsAt: grant?.starts_at ?? null, expiresAt: grant?.expires_at ?? null };
+  }
+
+  async setPastRescheduleAccess(userId: string, dto: UpdatePastRescheduleAccessDto, actor: AuthUser, requestId?: string) {
+    return this.db.transaction(async (tx) => {
+      const target = await tx.execute(sql`
+        SELECT sp.user_id, sp.archived_at, u.status
+        FROM staff_profiles sp
+        JOIN users u ON u.id=sp.user_id
+        WHERE sp.user_id=${userId}
+        FOR UPDATE OF sp,u
+      `);
+      if (!target.rowCount) throw new NotFoundException({ code: "STAFF_NOT_FOUND", message: "Staff member not found" });
+
+      const roleRows = await tx.execute(sql`
+        SELECT r.code FROM user_roles ur JOIN roles r ON r.id=ur.role_id WHERE ur.user_id=${userId}
+      `);
+      const targetRoles = (roleRows.rows as Array<{ code: string }>).map((row) => row.code);
+      if (!targetRoles.includes("MANAGER")) {
+        throw new ConflictException({ code: "PAST_RESCHEDULE_ACCESS_MANAGER_ONLY", message: "Past lesson rescheduling access can only be granted to a Manager" });
+      }
+
+      const [permission] = await tx.select({ id: permissions.id }).from(permissions).where(eq(permissions.code, PAST_RESCHEDULE_PERMISSION)).limit(1);
+      if (!permission) {
+        throw new ConflictException({ code: "PAST_RESCHEDULE_PERMISSION_NOT_CONFIGURED", message: "Past lesson rescheduling permission is not configured" });
+      }
+
+      await tx.execute(sql`
+        UPDATE temporary_permission_grants
+        SET revoked_at=now(), revoked_by=${actor.id}
+        WHERE user_id=${userId}
+          AND permission_id=${permission.id}
+          AND scope_type='GLOBAL'
+          AND scope_id IS NULL
+          AND revoked_at IS NULL
+          AND expires_at > now()
+      `);
+
+      if (!dto.enabled) {
+        await this.audit.record({
+          actorUserId: actor.id, actorRoleCode: actor.roles[0], action: "REVOKE_PAST_RESCHEDULE_ACCESS",
+          entityType: "User", entityId: userId, requestId,
+          beforeData: { permission: PAST_RESCHEDULE_PERMISSION }, afterData: { enabled: false },
+        }, tx as any);
+        return { eligible: true, enabled: false, startsAt: null, expiresAt: null };
+      }
+
+      const row = target.rows[0] as { archived_at: Date | null; status: string };
+      if (row.archived_at || row.status !== "ACTIVE") {
+        throw new ConflictException({ code: "STAFF_NOT_ACTIVE", message: "Reactivate the Manager account before granting additional access" });
+      }
+
+      const expiresAt = new Date(dto.expiresAt ?? "");
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+        throw new BadRequestException({ code: "INVALID_PERMISSION_EXPIRY", message: "Permission expiry must be a future date and time" });
+      }
+
+      const [grant] = await tx.insert(temporaryPermissionGrants).values({
+        userId, permissionId: permission.id, scopeType: "GLOBAL", scopeId: null, expiresAt, grantedBy: actor.id,
+      }).returning({ startsAt: temporaryPermissionGrants.startsAt, expiresAt: temporaryPermissionGrants.expiresAt });
+
+      await this.audit.record({
+        actorUserId: actor.id, actorRoleCode: actor.roles[0], action: "GRANT_PAST_RESCHEDULE_ACCESS",
+        entityType: "User", entityId: userId, requestId,
+        afterData: { permission: PAST_RESCHEDULE_PERMISSION, scopeType: "GLOBAL", expiresAt },
+      }, tx as any);
+
+      return { eligible: true, enabled: true, startsAt: grant.startsAt, expiresAt: grant.expiresAt };
+    });
   }
 
   async update(userId: string, dto: UpdateStaffDto, actor: AuthUser, requestId?: string) {

@@ -60,6 +60,7 @@ const permissionSeeds = [
   ["lesson.incident.record", "Record student and teacher lesson incidents"],
   ["lesson.mark", "Mark lessons"],
   ["lesson.reschedule", "Reschedule lessons"],
+  ["lesson.reschedule.past", "Reschedule lessons to a historical time"],
   ["lesson.balance.view", "View remaining lesson balance without financial details"],
   ["report.view", "View progress reports"],
   ["report.request", "Request a progress report"],

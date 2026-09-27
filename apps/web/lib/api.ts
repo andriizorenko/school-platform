@@ -5,6 +5,10 @@ const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api")
 const errorMessages: Record<string, string> = {
   INCIDENT_ALREADY_RECORDED_FOR_OCCURRENCE: "Для цього заняття подію вже зафіксовано. Спочатку перенесіть урок, а вже після нового запланованого часу можна фіксувати наступний інцидент.",
   TEACHER_RATE_NOT_CONFIGURED: "Для викладача немає чинної ставки з цього предмета на дату уроку. Додайте ставку в картці викладача й повторіть дію.",
+  PAST_RESCHEDULE_PERMISSION_REQUIRED: "Немає права переносити уроки в минуле.",
+  PAST_RESCHEDULE_REQUIRES_MANUAL_MODE: "Перенесення в минуле доступне лише через адміністративний ручний режим.",
+  PAST_RESCHEDULE_MUST_END_IN_PAST: "Оберіть час так, щоб урок повністю завершився до поточного моменту.",
+  PAST_RESCHEDULE_COMMENT_REQUIRED: "Для перенесення уроку в минуле обовʼязково вкажіть коментар.",
 };
 
 export class ApiError extends Error {

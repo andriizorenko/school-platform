@@ -5,6 +5,13 @@ import { api, type Me } from "../lib/api";
 import { dateOnly, dateTime } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 
+type PastRescheduleAccess = {
+  eligible: boolean;
+  enabled: boolean;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+};
+
 type StaffRow = {
   userId: string;
   firstName: string;
@@ -26,6 +33,17 @@ const roleLabel: Record<string, string> = {
   FINANCIER: "Фінансист",
   SUPPORT_MANAGER: "Техпідтримка",
 };
+
+function localDateTimeInput(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+function defaultPastAccessExpiry() {
+  const date = new Date();
+  date.setDate(date.getDate() + 30);
+  date.setSeconds(0, 0);
+  return localDateTimeInput(date);
+}
 
 const statusLabel: Record<string, string> = {
   PENDING: "Очікує активації",
@@ -57,6 +75,9 @@ export function TeamPage() {
   const [editStartedAt, setEditStartedAt] = useState("");
   const [editRole, setEditRole] = useState("MANAGER");
   const [suspensionReason, setSuspensionReason] = useState("");
+  const [pastAccess, setPastAccess] = useState<PastRescheduleAccess | null>(null);
+  const [pastAccessUntil, setPastAccessUntil] = useState(defaultPastAccessExpiry);
+  const [pastAccessBusy, setPastAccessBusy] = useState(false);
 
   async function load() {
     try {
@@ -89,6 +110,17 @@ export function TeamPage() {
     setEditRole(selected.roles.find((role) => ["MANAGER", "FINANCIER", "SUPPORT_MANAGER"].includes(role)) ?? "MANAGER");
     setSuspensionReason("");
   }, [selected?.userId]);
+
+  useEffect(() => {
+    setPastAccess(null);
+    setPastAccessUntil(defaultPastAccessExpiry());
+    if (!selected?.roles.includes("MANAGER")) return;
+    let cancelled = false;
+    api<PastRescheduleAccess>(`/staff/${selected.userId}/past-reschedule-access`)
+      .then((access) => { if (!cancelled) setPastAccess(access); })
+      .catch((e: any) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, [selected?.userId, selected?.roles.join(",")]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -146,6 +178,29 @@ export function TeamPage() {
       await load();
     } catch (e: any) {
       setError(e.message);
+    }
+  }
+
+  async function updatePastRescheduleAccess(enabled: boolean) {
+    if (!selected) return;
+    setPastAccessBusy(true);
+    setError("");
+    try {
+      const expiresAt = enabled ? new Date(pastAccessUntil) : null;
+      if (enabled && (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())) {
+        setError("Вкажіть майбутню дату завершення додаткового доступу.");
+        return;
+      }
+      const access = await api<PastRescheduleAccess>(`/staff/${selected.userId}/past-reschedule-access`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled, expiresAt: enabled ? expiresAt!.toISOString() : undefined }),
+      });
+      setPastAccess(access);
+      setMessage(enabled ? "Менеджеру надано право переносити уроки в минуле." : "Додаткове право менеджера відкликано.");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setPastAccessBusy(false);
     }
   }
 
@@ -296,6 +351,24 @@ export function TeamPage() {
                   </select>
                   <p className="muted form-note">Менеджеру з активними учнями не можна змінити роль, доки учнів не перепризначено.</p>
                   <button className="btn secondary" onClick={saveRole} disabled={selected.userId === me?.id || selected.userStatus === "ARCHIVED"}>Змінити роль</button>
+                </section>
+              )}
+
+              {selected.roles.includes("MANAGER") && (
+                <section className="card stack">
+                  <h3>Додаткові права</h3>
+                  <div><strong>Перенесення уроків у минуле</strong><p className="muted form-note" style={{marginTop:6}}>Небезпечна адміністративна дія для виправлення історії. Доступ видається конкретному менеджеру на обмежений час і фіксується в аудиті.</p></div>
+                  {pastAccess?.enabled ? (
+                    <>
+                      <div className="success">Доступ активний{pastAccess.expiresAt ? ` до ${dateTime(pastAccess.expiresAt)}` : ""}.</div>
+                      <button className="btn secondary" disabled={pastAccessBusy} onClick={()=>void updatePastRescheduleAccess(false)}>{pastAccessBusy ? "Зберігаємо…" : "Відкликати право"}</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="field"><label>Надати доступ до</label><input className="input" type="datetime-local" value={pastAccessUntil} onChange={(e)=>setPastAccessUntil(e.target.value)} disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy} /></div>
+                      <button className="btn secondary" disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy || !pastAccessUntil} onClick={()=>void updatePastRescheduleAccess(true)}>{pastAccessBusy ? "Зберігаємо…" : "Надати право"}</button>
+                    </>
+                  )}
                 </section>
               )}
 
