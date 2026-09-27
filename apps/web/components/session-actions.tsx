@@ -15,17 +15,23 @@ export type SessionActionDetail = {
   sessionType: "FIRST" | "REGULAR";
   fundingStatus: "PAID" | "BOOKED";
   startsAt: string;
+  status: string;
   needsReport?: boolean;
+  currentIncident?: {
+    type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
+    outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
+  } | null;
   capabilities: {
     canMark: boolean;
     canReschedule: boolean;
     canRescheduleToPast: boolean;
+    canUndoOutcome: boolean;
     canReportIncident: boolean;
     canAssignSubstitute: boolean;
   };
 };
 
-type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "student-no-show" | "teacher-late-cancellation" | null;
+type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "student-no-show" | "teacher-late-cancellation" | "undo-outcome" | null;
 
 type FreeSlot = { startsAt: string; endsAt: string; date: string; time: string };
 type FreeSlotsResponse = {
@@ -132,6 +138,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   const [substitutesLoading, setSubstitutesLoading] = useState(false);
   const [substituteCandidates, setSubstituteCandidates] = useState<SubstituteCandidate[]>([]);
   const [selectedSubstitute, setSelectedSubstitute] = useState("");
+  const [undoReason, setUndoReason] = useState("");
 
   const journalHref = useMemo(() => {
     if (!detail.enrollmentId) return null;
@@ -204,6 +211,9 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     if (next === "substitute") {
       setSubstituteCandidates([]);
       setSelectedSubstitute("");
+    }
+    if (next === "undo-outcome") {
+      setUndoReason("");
     }
     setAction(next);
   }
@@ -335,6 +345,37 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       body: JSON.stringify({ teacherId: selectedSubstitute }),
     }));
   }
+
+
+  async function undoOutcome(event: FormEvent) {
+    event.preventDefault();
+    if (!undoReason.trim()) {
+      setError("Вкажіть причину скасування відмітки.");
+      return;
+    }
+    await finish(() => api(`/sessions/${detail.id}/outcome/undo`, {
+      method: "POST",
+      body: JSON.stringify({ reason: undoReason.trim() }),
+    }));
+  }
+
+  const undoOutcomeLabel = detail.status === "COMPLETED"
+    ? (detail.sessionType === "FIRST" ? "Скасувати проведення першого уроку" : "Скасувати проведення уроку")
+    : detail.status === "CHARGED_NO_SHOW"
+      ? "Скасувати пропуск зі списанням"
+      : detail.currentIncident?.type === "STUDENT_NO_SHOW"
+        ? "Скасувати відмітку пропуску"
+        : detail.currentIncident?.type === "TEACHER_LATE_CANCELLATION"
+          ? "Скасувати пізнє скасування"
+          : "Скасувати відмітку";
+
+  const undoOutcomeExplanation = detail.status === "COMPLETED"
+    ? "Урок знову стане запланованим. Система поверне списані заняття та прибере неоплачене нарахування викладачу."
+    : detail.status === "CHARGED_NO_SHOW"
+      ? "Пропуск буде скасовано: урок знову стане запланованим, заняття повернеться на баланс, а неоплачене нарахування викладачу буде прибрано."
+      : detail.currentIncident?.type === "STUDENT_NO_SHOW"
+        ? "Відмітка пропуску буде прибрана, а лічильник пропусків учня перерахується."
+        : "Відмітка пізнього скасування буде прибрана, а повʼязані правила та компенсація будуть перераховані.";
 
   async function submitIncident(event: FormEvent, kind: "student-no-show" | "teacher-late-cancellation") {
     event.preventDefault();
@@ -491,6 +532,38 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     );
   }
 
+  if (action === "undo-outcome") {
+    return (
+      <form className="stack session-action-form" onSubmit={undoOutcome}>
+        <div className="row action-form-head">
+          <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
+          <strong>{undoOutcomeLabel}</strong>
+        </div>
+        <div className="notice-card">
+          <strong>Це коригувальна дія.</strong>
+          <div className="muted" style={{marginTop:6}}>{undoOutcomeExplanation}</div>
+          <div className="muted" style={{marginTop:6}}>Якщо нарахування вже потрапило у зарплатний період або повʼязана компенсація вже використана, система не дозволить скасування.</div>
+        </div>
+        <div className="field">
+          <label>Причина скасування *</label>
+          <textarea
+            className="textarea"
+            rows={3}
+            maxLength={500}
+            required
+            value={undoReason}
+            onChange={(event) => setUndoReason(event.target.value)}
+            placeholder="Наприклад: урок помилково відмічено як проведений"
+          />
+        </div>
+        {error && <div className="error">{error}</div>}
+        <button className="btn danger" disabled={busy || undoReason.trim().length < 3}>
+          {busy ? "Скасовуємо…" : undoOutcomeLabel}
+        </button>
+      </form>
+    );
+  }
+
   if (action === "student-no-show" || action === "teacher-late-cancellation") {
     const studentNoShow = action === "student-no-show";
     return (
@@ -511,6 +584,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
       {detail.capabilities.canReportIncident && (role === "TEACHER" || role === "MANAGER" || role === "ADMIN") && <><button disabled={busy} className="btn secondary" onClick={() => open("student-no-show")}>Учень не прийшов</button><button disabled={busy} className="btn secondary" onClick={() => open("teacher-late-cancellation")}>{role === "TEACHER" ? "Не можу провести (пізнє скасування)" : "Пізнє скасування викладача"}</button></>}
+      {detail.capabilities.canUndoOutcome && <button disabled={busy} className="btn secondary danger-outline" onClick={() => open("undo-outcome")}>{undoOutcomeLabel}</button>}
       {journalHref && <Link className="btn secondary" href={journalHref}>Журнал учня</Link>}
     </div>
   );
