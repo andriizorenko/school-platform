@@ -23,6 +23,7 @@ export type SessionActionDetail = {
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
   } | null;
   capabilities: {
+    canShowMark: boolean;
     canMark: boolean;
     canReschedule: boolean;
     canRescheduleToPast: boolean;
@@ -101,6 +102,14 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   const [substituteCandidates, setSubstituteCandidates] = useState<SubstituteCandidate[]>([]);
   const [selectedSubstitute, setSelectedSubstitute] = useState("");
   const [undoReason, setUndoReason] = useState("");
+
+  const markDisabledText = !detail.capabilities.canShowMark || detail.capabilities.canMark
+    ? ""
+    : detail.fundingStatus !== "PAID"
+      ? "Спочатку потрібно зафіксувати оплату."
+      : Date.now() < new Date(detail.startsAt).getTime()
+        ? `Можна відмітити після ${timeOnly(detail.startsAt)}.`
+        : "Вікно відмітки для викладача завершилось.";
 
   const journalHref = useMemo(() => {
     if (!detail.enrollmentId) return null;
@@ -689,7 +698,10 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   return (
     <div className="stack session-actions">
       {detail.sessionType === "FIRST" && detail.fundingStatus === "BOOKED" && (role === "MANAGER" || role === "ADMIN") && <button disabled={busy} className="btn" onClick={() => open("first-payment")}>Зафіксувати оплату</button>}
-      {detail.capabilities.canMark && <button disabled={busy} className="btn" onClick={() => open("mark")}>Відмітити урок</button>}
+      {detail.capabilities.canShowMark && <>
+        <button disabled={busy || !detail.capabilities.canMark} className="btn" onClick={() => open("mark")}>Відмітити урок</button>
+        {!detail.capabilities.canMark && markDisabledText && <div className="muted form-note">{markDisabledText}</div>}
+      </>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
       {detail.capabilities.canUndoOutcome && <button disabled={busy} className="btn secondary danger-outline" onClick={() => open("undo-outcome")}>{undoOutcomeLabel}</button>}
