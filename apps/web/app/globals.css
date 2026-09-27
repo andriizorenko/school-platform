@@ -1508,3 +1508,45 @@ th { background: rgba(247,249,255,.74); }
     backdrop-filter:blur(14px);
   }
 }
+
+
+.teacher-availability-line {
+  display:flex;
+  align-items:flex-start;
+  gap:6px;
+  margin:0 0 8px;
+  padding:6px 7px;
+  border:1px solid rgba(34,160,107,.14);
+  border-radius:9px;
+  background:rgba(236,253,243,.72);
+  color:#187454;
+  font-size:10px;
+  line-height:1.35;
+}
+.teacher-availability-line .teacher-availability-dot {
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
+  margin-top:3px;
+  border-radius:50%;
+  background:#22a06b;
+  box-shadow:0 0 0 3px rgba(34,160,107,.09);
+}
+.teacher-availability-line.busy {
+  border-color:rgba(217,119,6,.14);
+  background:rgba(255,247,237,.78);
+  color:#a15c08;
+}
+.teacher-availability-line.busy .teacher-availability-dot {
+  background:#d97706;
+  box-shadow:0 0 0 3px rgba(217,119,6,.09);
+}
+.teacher-availability-line.unavailable {
+  border-color:rgba(102,112,133,.13);
+  background:rgba(248,250,252,.76);
+  color:#667085;
+}
+.teacher-availability-line.unavailable .teacher-availability-dot {
+  background:#98a2b3;
+  box-shadow:none;
+}
