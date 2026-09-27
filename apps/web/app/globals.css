@@ -1597,32 +1597,32 @@ th { background: rgba(247,249,255,.74); }
 }
 .teacher-free-block {
   position:absolute;
-  left:3px;
-  right:3px;
+  left:4px;
+  right:4px;
   z-index:1;
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:2px;
+  gap:1px;
   min-height:12px;
   overflow:hidden;
-  border:1px dashed rgba(34,160,107,.26);
-  border-radius:8px;
+  border:1px dashed rgba(34,160,107,.18);
+  border-radius:9px;
   background:
-    linear-gradient(145deg,rgba(226,250,237,.82),rgba(239,253,246,.62));
-  color:#187454;
+    linear-gradient(145deg,rgba(231,250,240,.48),rgba(244,253,248,.30));
+  color:rgba(24,116,84,.74);
   text-align:center;
   pointer-events:none;
 }
 .teacher-free-block span {
-  font-size:9px;
-  font-weight:750;
+  font-size:8px;
+  font-weight:650;
   line-height:1.15;
 }
 .teacher-free-block strong {
-  font-size:10px;
-  font-weight:900;
+  font-size:9px;
+  font-weight:760;
   line-height:1.1;
 }
 .teacher-timeline-lesson {
@@ -1633,50 +1633,117 @@ th { background: rgba(247,249,255,.74); }
   width:auto;
   min-height:0;
   margin:0;
+  padding:7px 8px 6px;
   overflow:hidden;
   box-sizing:border-box;
-  box-shadow:0 5px 13px rgba(53,72,136,.11);
+  border-radius:10px;
+  box-shadow:0 6px 16px rgba(53,72,136,.12);
+}
+.teacher-timeline-lesson.completed {
+  border-left-color:var(--accent);
+  background:rgba(255,255,255,.92);
+}
+.teacher-timeline-lesson.first-lesson:not(.charged-no-show) {
+  border-color:#b9c8ff;
+  border-left-color:#4a63e7;
+  background:linear-gradient(145deg,rgba(239,244,255,.96),rgba(248,250,255,.88));
+}
+.teacher-timeline-lesson.charged-no-show {
+  border-color:#efaaa4;
+  border-left:4px solid #e24949;
+  background:linear-gradient(145deg,rgba(255,241,240,.98),rgba(255,249,248,.92));
 }
 .teacher-timeline-lesson:hover {
   z-index:5;
+  box-shadow:0 9px 20px rgba(53,72,136,.16);
 }
 .teacher-timeline-lesson .compact-event-top {
-  gap:3px;
+  gap:5px;
+  min-height:16px;
 }
 .teacher-timeline-lesson .compact-event-top strong {
+  flex:0 1 auto;
+  min-width:0;
   font-size:10px;
+  font-weight:850;
+  line-height:1;
+  letter-spacing:-.015em;
 }
 .teacher-timeline-lesson .compact-event-meta {
-  gap:3px;
+  gap:4px;
+  flex:0 0 auto;
 }
 .teacher-timeline-lesson .compact-payment-dot {
-  width:6px;
-  height:6px;
-  flex-basis:6px;
-  box-shadow:none;
+  width:7px;
+  height:7px;
+  flex:0 0 7px;
+  box-shadow:0 0 0 2px rgba(217,119,6,.08);
+}
+.teacher-timeline-lesson .compact-payment-dot.paid {
+  box-shadow:0 0 0 2px rgba(34,160,107,.08);
 }
 .teacher-timeline-lesson .compact-event-chip {
-  min-height:15px;
-  padding:1px 4px;
+  min-height:16px;
+  padding:1px 5px;
   font-size:8px;
+  font-weight:850;
+}
+.teacher-timeline-lesson .compact-event-chip.regular {
+  background:rgba(242,244,247,.92);
+  color:#475467;
+}
+.teacher-timeline-lesson .compact-event-chip.first {
+  background:#dfe7ff;
+  color:#3047b8;
+}
+.teacher-timeline-lesson .compact-event-chip.danger {
+  background:#fde1de;
+  color:#b42318;
 }
 .teacher-timeline-lesson .compact-event-student {
-  margin-top:3px;
+  margin-top:4px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
   font-size:11px;
+  font-weight:850;
+  line-height:1.08;
 }
 .teacher-timeline-lesson .compact-event-bottom {
-  margin-top:1px;
+  position:absolute;
+  left:8px;
+  right:6px;
+  bottom:5px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:5px;
+  min-width:0;
+  margin:0;
 }
 .teacher-timeline-lesson .compact-event-subject {
-  font-size:9px;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:8px;
+  line-height:1;
+  color:#7a8699;
+}
+.teacher-timeline-lesson .compact-event-indicators {
+  gap:4px;
 }
 .teacher-timeline-lesson .compact-completed-icon {
-  width:16px;
-  height:16px;
+  width:17px;
+  height:17px;
+  flex:0 0 17px;
+  background:#e8f8ef;
+  color:#15805c;
+  box-shadow:inset 0 0 0 1px rgba(21,128,92,.12);
 }
 .teacher-timeline-lesson .compact-completed-icon svg {
-  width:12px;
-  height:12px;
+  width:13px;
+  height:13px;
 }
 .teacher-timeline-status {
   position:absolute;
