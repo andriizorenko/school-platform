@@ -326,6 +326,97 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     </div>
   </button>;
 
+  const timelineRangeFor = (scopeDays: Date[]) => {
+    const intervals: ClockWindow[] = [];
+    for (const day of scopeDays) {
+      const availability = teacherFreeWindowsFor(day);
+      if (availability?.kind === "AVAILABLE") intervals.push(...availability.windows);
+      for (const event of eventsFor(day)) {
+        const start = clockMinutes(timeOnly(eventStart(event)));
+        const end = clockMinutes(timeOnly(eventEnd(event)));
+        if (end > start) intervals.push({ start, end });
+      }
+    }
+    if (!intervals.length) return { start: 8 * 60, end: 20 * 60 };
+    const start = Math.max(0, Math.floor(Math.min(...intervals.map((item)=>item.start)) / 60) * 60);
+    const end = Math.min(24 * 60, Math.ceil(Math.max(...intervals.map((item)=>item.end)) / 60) * 60);
+    return end > start ? { start, end } : { start, end: Math.min(24 * 60, start + 60) };
+  };
+
+  const timelineBlockStyle = (window: ClockWindow, timeline: ClockWindow) => {
+    const start = Math.max(window.start, timeline.start);
+    const end = Math.min(window.end, timeline.end);
+    const span = Math.max(1, timeline.end - timeline.start);
+    return {
+      top: `${((start - timeline.start) / span) * 100}%`,
+      height: `${Math.max(0, ((end - start) / span) * 100)}%`,
+    };
+  };
+
+  const timelineLesson = (e: CalendarEvent, timeline: ClockWindow) => {
+    const lessonWindow = {
+      start: clockMinutes(timeOnly(eventStart(e))),
+      end: clockMinutes(timeOnly(eventEnd(e))),
+    };
+    return <button
+      key={e.id}
+      className={`event compact-week-event teacher-timeline-lesson ${eventClass(e)} ${sessionType(e)==="FIRST"?"first-lesson":""}`}
+      style={timelineBlockStyle(lessonWindow, timeline)}
+      onClick={()=>setSelected(e)}
+      aria-label={`${timeOnly(eventStart(e))}–${timeOnly(eventEnd(e))}, ${studentName(e)}, ${subjectName(e)}, ${compactLessonLabel(e)}`}
+    >
+      <div className="compact-event-top">
+        <strong>{timeOnly(eventStart(e))}-{timeOnly(eventEnd(e))}</strong>
+        <div className="compact-event-meta">
+          <span className={`compact-payment-dot ${funding(e).toLowerCase()}`} title={funding(e)==="PAID"?"Сплачено":"Бронь"} aria-label={funding(e)==="PAID"?"Сплачено":"Бронь"} />
+          <span className={`compact-event-chip ${compactLessonClass(e)}`}>{compactLessonLabel(e)}</span>
+        </div>
+      </div>
+      <div className="compact-event-student">{studentName(e)}</div>
+      <div className="compact-event-bottom">
+        <div className="compact-event-subject">{subjectName(e)}{teacherLabel(e)}</div>
+        <div className="compact-event-indicators">
+          {(e.needsReport??e.needs_report)&&<span className="compact-event-chip report">ЗВІТ</span>}
+          {lifecycleStatus(e)==="COMPLETED"&&<span className="compact-completed-icon" title="Урок проведено" aria-label="Урок проведено">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8"/><path d="m6.5 10 2.2 2.2 4.8-5"/></svg>
+          </span>}
+          {lifecycleStatus(e)==="CANCELLED"&&<span className="compact-event-chip muted">СКАС.</span>}
+        </div>
+      </div>
+    </button>;
+  };
+
+  const timelineDay = (d: Date, timeline: ClockWindow, variant: "week" | "day" = "week") => {
+    const availability = teacherFreeWindowsFor(d);
+    const dayEvents = eventsFor(d);
+    const spanHours = Math.max(1, (timeline.end - timeline.start) / 60);
+    const height = Math.max(260, Math.min(760, spanHours * 56));
+    return <section className={`teacher-timeline-day ${variant==="day"?"teacher-timeline-day-wide":""} ${dateParam(d)===todayKey?"today":""}`} key={dateParam(d)}>
+      <div className="calendar-day-heading">
+        <h3>{dateOnly(d)}</h3>
+        {dayEvents.length>0&&<span className="calendar-day-count">{dayEvents.length}</span>}
+      </div>
+      <div className="teacher-timeline-range">{clockLabel(timeline.start)}–{clockLabel(timeline.end)}</div>
+      <div
+        className="teacher-timeline-track"
+        style={{height:`${height}px`,backgroundSize:`100% ${height/spanHours}px`}}
+      >
+        {availability?.kind==="AVAILABLE"&&availability.windows.map((window,index)=><div
+          className="teacher-free-block"
+          key={`free-${dateParam(d)}-${index}`}
+          style={timelineBlockStyle(window,timeline)}
+          title={`Вільно ${clockLabel(window.start)}–${clockLabel(window.end)}`}
+        >
+          <span>{clockLabel(window.start)}–{clockLabel(window.end)}</span>
+          <strong>Вільно</strong>
+        </div>)}
+        {availability?.kind==="VACATION"&&<div className="teacher-timeline-status">Відпустка</div>}
+        {availability?.kind==="UNAVAILABLE"&&<div className="teacher-timeline-status">Недоступний</div>}
+        {dayEvents.map((event)=>timelineLesson(event,timeline))}
+      </div>
+    </section>;
+  };
+
   function updateFilter(key: keyof CalendarFilters, value: string) {
     setFilters(current => ({ ...current, [key]: value }));
   }
@@ -361,17 +452,20 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
     {error && <div className="error" style={{marginBottom:12}}>{error}</div>}
     {availabilityError && role === "TEACHER" && <div className="error" style={{marginBottom:12}}>{availabilityError}</div>}
 
-    {mode === "day" ? <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{availabilityLine(anchor)}{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div> : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
-      <div className="calendar-week">{days.map(d => {
+    {mode === "day" ? (
+      role === "TEACHER" && teacherAvailability
+        ? <div className="teacher-day-timeline">{timelineDay(anchor,timelineRangeFor([anchor]),"day")}</div>
+        : <div className="calendar-day"><h3>{dateOnly(anchor)}</h3>{availabilityLine(anchor)}{eventsFor(anchor).length ? eventsFor(anchor).map(card) : <div className="empty">Немає занять</div>}</div>
+    ) : mode === "month" ? <div className="calendar-month">{days.map(d => <div className={`calendar-month-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}><strong>{d.getDate()}</strong><div className="stack" style={{marginTop:8}}>{eventsFor(d).slice(0,3).map(card)}{eventsFor(d).length>3 && <span className="muted">+{eventsFor(d).length-3} ще</span>}</div></div>)}</div> : <>
+      {role === "TEACHER" && teacherAvailability ? <div className="teacher-week-timeline">{days.map(d=>timelineDay(d,timelineRangeFor(days)))}</div> : <div className="calendar-week">{days.map(d => {
         const dayEvents = eventsFor(d);
         const visibleEvents = dayEvents.slice(0, 5);
         return <section className={`calendar-day ${dateParam(d) === todayKey ? "today" : ""}`} key={dateParam(d)}>
           <div className="calendar-day-heading"><h3>{dateOnly(d)}</h3>{dayEvents.length>0&&<span className="calendar-day-count">{dayEvents.length}</span>}</div>
-          {availabilityLine(d)}
           {visibleEvents.length ? visibleEvents.map(compactCard) : <div className="muted calendar-day-empty">Немає занять</div>}
           {dayEvents.length>visibleEvents.length&&<button className="calendar-day-more" type="button" onClick={()=>{setAnchor(d);setMode("day")}}>Ще {dayEvents.length-visibleEvents.length} · відкрити день</button>}
         </section>;
-      })}</div>
+      })}</div>}
       <div className="mobile-day-nav">{days.map(d => <button key={dateParam(d)} onClick={()=>refs.current[dateParam(d)]?.scrollIntoView({behavior:"smooth",block:"start"})}>{new Intl.DateTimeFormat("uk-UA",{weekday:"short",timeZone:"Europe/Kyiv"}).format(d)}<br/><small>{d.getDate()}</small></button>)}</div>
       <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{availabilityLine(d)}{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
     </>}
