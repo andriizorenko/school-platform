@@ -1766,3 +1766,54 @@ th { background: rgba(247,249,255,.74); }
   .teacher-timeline-day { padding:10px; }
   .teacher-timeline-lesson .compact-event-top strong { font-size:11px; }
 }
+
+
+/* Requested progress-report reminder shown immediately after a marked lesson. */
+.report-reminder-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(16,24,40,.34);
+  backdrop-filter: blur(5px);
+}
+.report-reminder-modal {
+  width: min(470px, 100%);
+  display: grid;
+  grid-template-columns: 42px minmax(0,1fr);
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid rgba(217,70,239,.16);
+  border-radius: 18px;
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 24px 70px rgba(16,24,40,.22);
+}
+.report-reminder-modal h3 { margin: 1px 0 6px; font-size: 18px; }
+.report-reminder-modal p { margin: 0; color: var(--muted); line-height: 1.5; }
+.report-reminder-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fce7f6;
+  color: #c11574;
+  font-size: 20px;
+  font-weight: 900;
+}
+.report-reminder-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+#pending-reports { scroll-margin-top: 92px; }
+@media (max-width: 600px) {
+  .report-reminder-modal { grid-template-columns: 36px minmax(0,1fr); padding: 18px; border-radius: 16px; }
+  .report-reminder-icon { width: 36px; height: 36px; font-size: 18px; }
+  .report-reminder-actions { flex-direction: column-reverse; }
+  .report-reminder-actions .btn { width: 100%; }
+}
