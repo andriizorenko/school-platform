@@ -39,7 +39,7 @@ type SessionDetail = {
   homeworkAssigned?: boolean | null;
   needsReport: boolean;
   balanceLessonUnits?: number | null;
-  capabilities: { canMark: boolean; canReschedule: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
+  capabilities: { canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
 };
 
 type FilterOptions = {
@@ -145,6 +145,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [reportReminder, setReportReminder] = useState<{ studentId: string; studentName: string } | null>(null);
   const [filters, setFilters] = useState<CalendarFilters>(EMPTY_FILTERS);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [filtersLoading, setFiltersLoading] = useState(false);
@@ -470,6 +471,24 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       <div className="mobile-week-list">{days.map(d => <section className="card mobile-week-section" ref={el=>{refs.current[dateParam(d)]=el;}} key={dateParam(d)}><h3>{new Intl.DateTimeFormat("uk-UA",{weekday:"long",day:"2-digit",month:"2-digit",timeZone:"Europe/Kyiv"}).format(d)}</h3>{availabilityLine(d)}{eventsFor(d).length ? eventsFor(d).map(card) : <div className="muted">Немає занять</div>}</section>)}</div>
     </>}
 
+    {reportReminder && <div className="report-reminder-backdrop">
+      <section className="report-reminder-modal" role="dialog" aria-modal="true" aria-labelledby="report-reminder-title">
+        <div className="report-reminder-icon" aria-hidden="true">!</div>
+        <div>
+          <h3 id="report-reminder-title">Не забудь про звіт</h3>
+          <p>Урок із {reportReminder.studentName} відмічено. Батьки очікують звіт про успішність за цим заняттям.</p>
+        </div>
+        <div className="report-reminder-actions">
+          <button type="button" className="btn secondary" onClick={()=>setReportReminder(null)}>Гаразд</button>
+          <button type="button" className="btn" onClick={()=>{
+            const studentId = reportReminder.studentId;
+            setReportReminder(null);
+            window.location.assign(`/teacher/students/${studentId}#pending-reports`);
+          }}>Заповнити зараз</button>
+        </div>
+      </section>
+    </div>}
+
     {selected && <div className="sheet-backdrop" onClick={()=>setSelected(null)}><aside className="sheet" onClick={e=>e.stopPropagation()}><button className="sheet-close" onClick={()=>setSelected(null)}>×</button>{detailLoading?<div className="empty">Завантаження…</div>:detail?<div className="stack" style={{marginTop:40}}>
       <div><h2>{detail.student.lastName} {detail.student.firstName}</h2><p className="muted">{detail.student.gradeLevel?`${detail.student.gradeLevel} клас · `:""}{detail.subject.name}</p></div>
       <div><strong>{dateTime(detail.startsAt)}</strong><div className="muted">до {timeOnly(detail.endsAt)}</div></div>
@@ -479,7 +498,15 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       {detail.parent&&<div><div className="muted">Контакт батьків</div><strong>{detail.parent.lastName} {detail.parent.firstName}</strong>{detail.parent.phone&&<div><a href={`tel:${detail.parent.phone}`}>{phoneNumber(detail.parent.phone)}</a></div>}</div>}
       {detail.actualTeacher.zoomUrl&&<a className="btn" href={detail.actualTeacher.zoomUrl} target="_blank" rel="noreferrer">Приєднатися до Zoom</a>}
       {actionError&&<div className="error">{actionError}</div>}
-      <SessionActions role={role} detail={detail} onSuccess={async()=>{await loadEvents();setSelected(null);}} />
+      <SessionActions
+        role={role}
+        detail={detail}
+        onReportReminder={(studentId) => setReportReminder({
+          studentId,
+          studentName: `${detail.student.firstName} ${detail.student.lastName}`,
+        })}
+        onSuccess={async()=>{await loadEvents();setSelected(null);}}
+      />
     </div>:<div className="error">{actionError||"Не вдалося завантажити заняття"}</div>}</aside></div>}
   </>;
 }
