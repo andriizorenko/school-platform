@@ -36,7 +36,7 @@ export type SessionActionDetail = {
   };
 };
 
-type Action = "mark" | "first-payment" | "reschedule" | "substitute" | "undo-outcome" | null;
+type Action = "mark" | "first-payment" | "reschedule" | "admin-reschedule" | "substitute" | "undo-outcome" | null;
 type RescheduleParty = "STUDENT" | "TEACHER";
 type RescheduleSituation = "ADVANCE" | "LATE" | "TECHNICAL";
 type RescheduleStep = "context" | "slot";
@@ -220,6 +220,10 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         setTeacherCompensationGranted(false);
         setRescheduleStep("context");
       }
+    }
+    if (next === "admin-reschedule") {
+      setManualStartsAt("");
+      setRescheduleComment("");
     }
     if (next === "substitute") {
       setSubstituteCandidates([]);
@@ -443,7 +447,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       method: "POST",
       body: JSON.stringify({
         startsAt: startsAt.toISOString(),
-        reason: rescheduleReason,
+        reason: "SCHOOL_REASON",
         mode: "MANUAL",
         comment: rescheduleComment.trim(),
       }),
@@ -641,15 +645,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
             {slotDays === 14 && <button type="button" className="btn secondary" disabled={slotsLoading} onClick={()=>setSlotDays(28)}>Показати вільні години на 28 днів</button>}
 
-            <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder={detail.capabilities.canRescheduleToPast ? "Для перенесення в минуле — обовʼязково" : "Необовʼязково"} /></div>
-
-            {detail.capabilities.canRescheduleToPast && !rescheduleAfterIncident && (
-              <div className="notice-card stack">
-                <div><strong>Адміністративне перенесення в минуле</strong><div className="muted" style={{marginTop:6}}>Для виправлення історичної дати уроку. Увесь урок має вже завершитися, а дія фіксується в аудиті.</div></div>
-                <div className="field"><label>Нова дата й час початку</label><input className="input" type="datetime-local" value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} /></div>
-                <button type="button" className="btn secondary" disabled={busy || !manualStartsAt || !rescheduleComment.trim()} onClick={()=>void moveToPast()}>{busy ? "Переносимо…" : "Перенести в минуле"}</button>
-              </div>
-            )}
+            <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder="Необовʼязково" /></div>
 
             <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
             {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
@@ -658,6 +654,45 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
             {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterIncident === "student-no-show" ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
           </>
         )}
+      </form>
+    );
+  }
+
+  if (action === "admin-reschedule") {
+    return (
+      <form className="stack session-action-form" onSubmit={(event) => { event.preventDefault(); void moveToPast(); }}>
+        <div className="row action-form-head">
+          <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
+          <strong>Адміністративне перенесення</strong>
+        </div>
+
+        <div className="notice-card">
+          <strong>Історичне виправлення дати уроку.</strong>
+          <div className="muted" style={{marginTop:6}}>Увесь урок має вже завершитися на новому часі. Дія фіксується в аудиті.</div>
+        </div>
+
+        <div className="field">
+          <label>Нова дата й час початку</label>
+          <input className="input" type="datetime-local" required value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>Причина перенесення *</label>
+          <textarea
+            className="textarea"
+            rows={3}
+            maxLength={500}
+            required
+            value={rescheduleComment}
+            onChange={(event)=>setRescheduleComment(event.target.value)}
+            placeholder="Наприклад: виправлення помилково вказаного часу"
+          />
+        </div>
+
+        {error && <div className="error">{error}</div>}
+        <button className="btn" disabled={busy || !manualStartsAt || !rescheduleComment.trim()}>
+          {busy ? "Переносимо…" : "Перенести урок"}
+        </button>
       </form>
     );
   }
@@ -726,6 +761,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         {!detail.capabilities.canMark && markDisabledText && <div className="muted form-note">{markDisabledText}</div>}
       </>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
+      {detail.capabilities.canRescheduleToPast && <button disabled={busy} className="btn secondary" onClick={() => open("admin-reschedule")}>Адміністративне перенесення</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
       {detail.capabilities.canUndoOutcome && <button disabled={busy} className="btn secondary danger-outline" onClick={() => open("undo-outcome")}>{undoOutcomeLabel}</button>}
       {journalHref && <Link className="btn secondary" href={journalHref}>Журнал учня</Link>}
