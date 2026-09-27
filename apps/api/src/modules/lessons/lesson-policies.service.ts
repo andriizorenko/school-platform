@@ -806,8 +806,8 @@ export class LessonPoliciesService {
       const now = new Date();
       const teacherMarkDeadlineHours = await numberSchoolSetting(tx, "teacher_mark_deadline_hours", 48);
       const firstLessonTeacherPayMinor = await numberSchoolSetting(tx, "first_lesson_teacher_pay_minor", 15_000);
-      if (now < session.ends_at) {
-        throw new ConflictException({ code: "LESSON_NOT_FINISHED", message: "First lesson can only be completed after it ends" });
+      if (now < session.starts_at) {
+        throw new ConflictException({ code: "LESSON_NOT_STARTED", message: "First lesson can only be completed after it starts" });
       }
       const privileged = actor.roles.some((role) => PRIVILEGED_ROLES.has(role));
       if (!privileged) {
