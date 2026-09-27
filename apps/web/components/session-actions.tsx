@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { dateOnly, timeOnly } from "../lib/format";
 
@@ -73,6 +73,7 @@ type Props = {
 };
 
 export function SessionActions({ role, detail, onSuccess, onReportReminder }: Props) {
+  const actionFormRef = useRef<HTMLFormElement | null>(null);
   const [action, setAction] = useState<Action>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -125,6 +126,14 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     }
     return [...groups.entries()];
   }, [slotData]);
+
+  useEffect(() => {
+    if (action !== "reschedule") return;
+    const frame = window.requestAnimationFrame(() => {
+      actionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [action, rescheduleStep]);
 
   useEffect(() => {
     if (action !== "reschedule" || rescheduleStep !== "slot") return;
@@ -525,6 +534,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   if (action === "reschedule") {
     return (
       <form
+        ref={actionFormRef}
         className="stack session-action-form"
         onSubmit={rescheduleStep === "slot"
           ? submitReschedule
@@ -537,7 +547,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
         {rescheduleStep === "context" ? (
           <>
-            <fieldset className="choice-field">
+            <fieldset className="choice-field reschedule-party-field">
               <legend>Хто переносить урок?</legend>
               {rescheduleParties.map((party) => (
                 <label key={party.value} className={`choice-card ${rescheduleParty === party.value ? "selected" : ""}`}>
@@ -556,7 +566,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
               ))}
             </fieldset>
 
-            {rescheduleParty && <fieldset className="choice-field">
+            {rescheduleParty && <fieldset className="choice-field reschedule-situation-field">
               <legend>Що сталося?</legend>
               {rescheduleSituations.map((situation) => (
                 <label key={situation.value} className={`choice-card ${rescheduleSituation === situation.value ? "selected" : ""} ${situation.disabled ? "disabled" : ""}`}>
