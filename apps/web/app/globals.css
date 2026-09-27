@@ -1817,3 +1817,13 @@ th { background: rgba(247,249,255,.74); }
   .report-reminder-actions { flex-direction: column-reverse; }
   .report-reminder-actions .btn { width: 100%; }
 }
+
+.btn.danger-outline {
+  border-color: rgba(180,35,24,.28);
+  background: rgba(255,247,246,.88);
+  color: #b42318;
+}
+.btn.danger-outline:hover {
+  border-color: rgba(180,35,24,.46);
+  background: #fff1f0;
+}
