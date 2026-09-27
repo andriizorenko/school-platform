@@ -284,6 +284,34 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     ? `${detail.lateNoticeCutoffMinutes / 60} год`
     : `${detail.lateNoticeCutoffMinutes} хв`;
 
+  const rescheduleParties: Array<{ value: RescheduleParty; label: string; note: string }> = [
+    { value: "STUDENT", label: "Учень", note: "Перенесення з боку учня або батьків" },
+    { value: "TEACHER", label: "Викладач", note: "Перенесення з боку викладача" },
+  ];
+  if (role === "ADMIN" || role === "MANAGER") {
+    rescheduleParties.push({ value: "SCHOOL", label: "Школа / інше", note: "Організаційна або службова причина" });
+  }
+
+  const rescheduleSituations: Array<{ value: RescheduleSituation; label: string; note: string; disabled?: boolean }> =
+    rescheduleParty === "STUDENT"
+      ? [
+          { value: "ADVANCE", label: "Завчасно попередили", note: `Не пізніше ніж за ${lateNoticeLabel} до уроку · без strike` },
+          { value: "LATE", label: "Без завчасного попередження", note: `Пізніше ніж за ${lateNoticeLabel} або не попередили · діє правило пропусків`, disabled: !detail.capabilities.canReportIncident },
+          { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо · без strike" },
+        ]
+      : rescheduleParty === "TEACHER"
+        ? [
+            { value: "ADVANCE", label: "Завчасно попередив", note: `Не пізніше ніж за ${lateNoticeLabel} до уроку · без strike` },
+            { value: "LATE", label: "Пізнє скасування", note: `Пізніше ніж за ${lateNoticeLabel} · діє правило пізніх скасувань`, disabled: !detail.capabilities.canReportIncident },
+            { value: "TECHNICAL", label: "Технічні / форс-мажорні", note: "Світло, звʼязок, тривога, обстріл тощо · без strike" },
+          ]
+        : rescheduleParty === "SCHOOL"
+          ? [
+              { value: "SCHOOL", label: "Організаційна причина", note: "Перенесення з боку школи · без strike" },
+              { value: "OTHER", label: "Інша причина", note: "Службовий випадок, який не підпадає під інші категорії" },
+            ]
+          : [];
+
   function mappedRescheduleReason() {
     if (rescheduleParty === "STUDENT") {
       if (rescheduleSituation === "ADVANCE") return "STUDENT_ADVANCE_NOTICE";
@@ -437,39 +465,6 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         ? "Відмітка пропуску буде прибрана, а лічильник пропусків учня перерахується."
         : "Відмітка пізнього скасування буде прибрана, а повʼязані правила та компенсація будуть перераховані.";
 
-  async function submitIncident(event: FormEvent, kind: "student-no-show" | "teacher-late-cancellation") {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const result = await api<any>(`/sessions/${detail.id}/incidents/${kind}`, {
-        method: "POST",
-        body: JSON.stringify({ comment: incidentComment.trim() || undefined }),
-      });
-
-      if (result?.requiresReschedule) {
-        if (kind === "student-no-show") {
-          setRescheduleReason("STUDENT_CANNOT_ATTEND");
-          setRescheduleComment(incidentComment.trim() || "Відпрацювання після пропуску");
-          setRescheduleAfterIncident("student-no-show");
-        } else {
-          setRescheduleReason("TEACHER_PERSONAL");
-          setRescheduleComment(incidentComment.trim() || "Перенесення після пізнього скасування викладача");
-          setTeacherCompensationGranted(Boolean(result?.compensationGranted));
-          setRescheduleAfterIncident("teacher-late-cancellation");
-        }
-        setAction("reschedule");
-        return;
-      }
-
-      await onSuccess();
-    } catch (exception: any) {
-      setError(exception?.message ?? "Не вдалося виконати дію");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (action === "mark") {
     return (
       <form className="stack session-action-form" onSubmit={submitMark}>
@@ -520,50 +515,117 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
   if (action === "reschedule") {
     return (
-      <form className="stack session-action-form" onSubmit={submitReschedule}>
+      <form
+        className="stack session-action-form"
+        onSubmit={rescheduleStep === "slot"
+          ? submitReschedule
+          : (event) => { event.preventDefault(); void continueRescheduleContext(); }}
+      >
         <div className="row action-form-head">
           <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
-          <strong>{rescheduleAfterIncident === "student-no-show" ? "Домовитись про відпрацювання" : rescheduleAfterIncident === "teacher-late-cancellation" ? "Перенести після скасування" : "Перенести заняття"}</strong>
+          <strong>{rescheduleAfterIncident === "student-no-show" ? "Домовитись про відпрацювання" : rescheduleAfterIncident === "teacher-late-cancellation" ? "Перенести після скасування" : "Перенести урок"}</strong>
         </div>
 
-        {rescheduleAfterIncident === "student-no-show" && <div className="notice-card"><strong>Пропуск зафіксовано без списання.</strong><div className="muted" style={{marginTop:6}}>Якщо узгоджуєте відпрацювання, оберіть вільну годину викладача нижче або перенесіть заняття в кінець абонементу.</div></div>}
-        {rescheduleAfterIncident === "teacher-late-cancellation" && <div className="notice-card"><strong>{teacherCompensationGranted ? "Повторне пізнє скасування зафіксовано. Учню нараховано компенсаційне заняття." : "Пізнє скасування зафіксовано без списання заняття."}</strong><div className="muted" style={{marginTop:6}}>Оберіть нову вільну годину викладача або перенесіть заняття в кінець абонементу.</div></div>}
-
-        <RescheduleReasonFields role={role} value={rescheduleReason} onChange={setRescheduleReason} />
-
-        <div className="field">
-          <label>Вільні години цього викладача</label>
-          {slotsLoading ? <div className="empty compact-empty">Шукаємо вільні години…</div> : slotGroups.length ? (
-            <div className="free-slot-list">
-              {slotGroups.map(([date, slots]) => (
-                <div className="free-slot-day" key={date}>
-                  <strong>{dateOnly(slots[0].startsAt)}</strong>
-                  <div className="free-slot-times">
-                    {slots.map(slot => <button key={slot.startsAt} type="button" className={`slot-button ${selectedSlot === slot.startsAt ? "selected" : ""}`} onClick={()=>setSelectedSlot(slot.startsAt)}>{timeOnly(slot.startsAt)}</button>)}
-                  </div>
-                </div>
+        {rescheduleStep === "context" ? (
+          <>
+            <fieldset className="choice-field">
+              <legend>Хто переносить урок?</legend>
+              {rescheduleParties.map((party) => (
+                <label key={party.value} className={`choice-card ${rescheduleParty === party.value ? "selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="reschedule-party"
+                    checked={rescheduleParty === party.value}
+                    onChange={() => {
+                      setRescheduleParty(party.value);
+                      setRescheduleSituation("");
+                      setError("");
+                    }}
+                  />
+                  <span><strong>{party.label}</strong><span className="muted" style={{display:"block",fontSize:12,marginTop:3}}>{party.note}</span></span>
+                </label>
               ))}
+            </fieldset>
+
+            {rescheduleParty && <fieldset className="choice-field">
+              <legend>Що сталося?</legend>
+              {rescheduleSituations.map((situation) => (
+                <label key={situation.value} className={`choice-card ${rescheduleSituation === situation.value ? "selected" : ""} ${situation.disabled ? "disabled" : ""}`}>
+                  <input
+                    type="radio"
+                    name="reschedule-situation"
+                    disabled={situation.disabled}
+                    checked={rescheduleSituation === situation.value}
+                    onChange={() => {
+                      setRescheduleSituation(situation.value);
+                      setError("");
+                    }}
+                  />
+                  <span><strong>{situation.label}</strong><span className="muted" style={{display:"block",fontSize:12,marginTop:3}}>{situation.note}</span></span>
+                </label>
+              ))}
+            </fieldset>}
+
+            {rescheduleParty && (rescheduleParty === "STUDENT" || rescheduleParty === "TEACHER") && !detail.capabilities.canReportIncident && (
+              <div className="muted form-note">Пізня відміна стане доступною лише всередині вікна {lateNoticeLabel} до уроку. Завчасне або форс-мажорне перенесення можна оформити зараз.</div>
+            )}
+
+            <div className="field">
+              <label>Коментар</label>
+              <textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder="Деталі — необовʼязково" />
             </div>
-          ) : <div className="notice-card">На вибраний період вільних годин не знайдено.</div>}
-        </div>
 
-        {slotDays === 14 && <button type="button" className="btn secondary" disabled={slotsLoading} onClick={()=>setSlotDays(28)}>Показати вільні години на 28 днів</button>}
+            {error && <div className="error">{error}</div>}
+            <button className="btn" disabled={busy || !rescheduleParty || !rescheduleSituation}>{busy ? "Перевіряємо…" : "Продовжити"}</button>
+          </>
+        ) : (
+          <>
+            {rescheduleAfterIncident === "student-no-show" && <div className="notice-card"><strong>Пропуск без завчасного попередження зафіксовано.</strong><div className="muted" style={{marginTop:6}}>Для першого strike заняття не списується. Оберіть відпрацювання або перенесіть його в кінець абонементу.</div></div>}
+            {rescheduleAfterIncident === "teacher-late-cancellation" && <div className="notice-card"><strong>{teacherCompensationGranted ? "Повторне пізнє скасування зафіксовано. Учню нараховано компенсаційне заняття." : "Пізнє скасування викладача зафіксовано."}</strong><div className="muted" style={{marginTop:6}}>Оберіть нову вільну годину або перенесіть заняття в кінець абонементу.</div></div>}
 
-        <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder={detail.capabilities.canRescheduleToPast ? "Для перенесення в минуле — обовʼязково" : "Необовʼязково"} /></div>
+            {!rescheduleAfterIncident && role !== "PARENT" && (
+              <div className="notice-card">
+                <strong>{rescheduleParty === "STUDENT" ? "Учень" : rescheduleParty === "TEACHER" ? "Викладач" : "Школа"} · {rescheduleSituations.find((item) => item.value === rescheduleSituation)?.label ?? "Перенесення"}</strong>
+                <div className="muted" style={{marginTop:6}}>Якщо причина обрана помилково, поверніться назад і змініть її до підтвердження перенесення.</div>
+                <button type="button" className="link-button" style={{marginTop:8}} onClick={() => { setRescheduleStep("context"); setSelectedSlot(""); setSlotData(null); }}>← Змінити причину</button>
+              </div>
+            )}
 
-        {detail.capabilities.canRescheduleToPast && !rescheduleAfterIncident && (
-          <div className="notice-card stack">
-            <div><strong>Адміністративне перенесення в минуле</strong><div className="muted" style={{marginTop:6}}>Для виправлення історичної дати уроку. Увесь урок має вже завершитися, а дія фіксується в аудиті.</div></div>
-            <div className="field"><label>Нова дата й час початку</label><input className="input" type="datetime-local" value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} /></div>
-            <button type="button" className="btn secondary" disabled={busy || !manualStartsAt || !rescheduleComment.trim()} onClick={()=>void moveToPast()}>{busy ? "Переносимо…" : "Перенести в минуле"}</button>
-          </div>
+            <div className="field">
+              <label>Вільні години цього викладача</label>
+              {slotsLoading ? <div className="empty compact-empty">Шукаємо вільні години…</div> : slotGroups.length ? (
+                <div className="free-slot-list">
+                  {slotGroups.map(([date, slots]) => (
+                    <div className="free-slot-day" key={date}>
+                      <strong>{dateOnly(slots[0].startsAt)}</strong>
+                      <div className="free-slot-times">
+                        {slots.map(slot => <button key={slot.startsAt} type="button" className={`slot-button ${selectedSlot === slot.startsAt ? "selected" : ""}`} onClick={()=>setSelectedSlot(slot.startsAt)}>{timeOnly(slot.startsAt)}</button>)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : <div className="notice-card">На вибраний період вільних годин не знайдено.</div>}
+            </div>
+
+            {slotDays === 14 && <button type="button" className="btn secondary" disabled={slotsLoading} onClick={()=>setSlotDays(28)}>Показати вільні години на 28 днів</button>}
+
+            <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={rescheduleComment} onChange={(event) => setRescheduleComment(event.target.value)} placeholder={detail.capabilities.canRescheduleToPast ? "Для перенесення в минуле — обовʼязково" : "Необовʼязково"} /></div>
+
+            {detail.capabilities.canRescheduleToPast && !rescheduleAfterIncident && (
+              <div className="notice-card stack">
+                <div><strong>Адміністративне перенесення в минуле</strong><div className="muted" style={{marginTop:6}}>Для виправлення історичної дати уроку. Увесь урок має вже завершитися, а дія фіксується в аудиті.</div></div>
+                <div className="field"><label>Нова дата й час початку</label><input className="input" type="datetime-local" value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} /></div>
+                <button type="button" className="btn secondary" disabled={busy || !manualStartsAt || !rescheduleComment.trim()} onClick={()=>void moveToPast()}>{busy ? "Переносимо…" : "Перенести в минуле"}</button>
+              </div>
+            )}
+
+            <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
+            {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
+            {error && <div className="error">{error}</div>}
+            <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : rescheduleAfterIncident === "student-no-show" ? "Відпрацювати у вибрану годину" : "Перенести на вибрану годину"}</button>
+            {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterIncident === "student-no-show" ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
+          </>
         )}
-
-        <p className="muted form-note">Це разове перенесення. Регулярний графік учня не змінюється.</p>
-        {role === "PARENT" && <p className="muted form-note">Батьки бачать лише вільні години цього ж викладача. Перенесення доступне не пізніше ніж за 2 години до поточного початку.</p>}
-        {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy || !selectedSlot}>{busy ? "Переносимо…" : rescheduleAfterIncident === "student-no-show" ? "Відпрацювати у вибрану годину" : "Перенести на вибрану годину"}</button>
-        {role !== "PARENT" && slotData?.canMoveToEnd && <button type="button" className="btn secondary" disabled={busy} onClick={moveToEnd}>{rescheduleAfterIncident === "student-no-show" ? "Додати відпрацювання в кінець абонементу" : "Перенести в кінець абонементу"}</button>}
       </form>
     );
   }
@@ -624,26 +686,12 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     );
   }
 
-  if (action === "student-no-show" || action === "teacher-late-cancellation") {
-    const studentNoShow = action === "student-no-show";
-    return (
-      <form className="stack session-action-form" onSubmit={(event) => submitIncident(event, action)}>
-        <div className="row action-form-head"><button type="button" className="link-button" onClick={() => open(null)}>← Назад</button><strong>{studentNoShow ? "Учень не прийшов" : "Пізнє скасування викладача"}</strong></div>
-        <div className="notice-card">{studentNoShow ? "Система застосує правило першого/другого пропуску для цього предмета." : "Система застосує правило першого/другого пізнього скасування для цієї пари викладач–учень."}</div>
-        <div className="field"><label>Коментар</label><textarea className="textarea" rows={3} maxLength={500} value={incidentComment} onChange={(event) => setIncidentComment(event.target.value)} placeholder="Обставини події — необовʼязково" /></div>
-        {error && <div className="error">{error}</div>}
-        <button className="btn danger" disabled={busy}>{busy ? "Фіксуємо…" : "Підтвердити"}</button>
-      </form>
-    );
-  }
-
   return (
     <div className="stack session-actions">
       {detail.sessionType === "FIRST" && detail.fundingStatus === "BOOKED" && (role === "MANAGER" || role === "ADMIN") && <button disabled={busy} className="btn" onClick={() => open("first-payment")}>Зафіксувати оплату</button>}
       {detail.capabilities.canMark && <button disabled={busy} className="btn" onClick={() => open("mark")}>Відмітити урок</button>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
-      {detail.capabilities.canReportIncident && (role === "TEACHER" || role === "MANAGER" || role === "ADMIN") && <><button disabled={busy} className="btn secondary" onClick={() => open("student-no-show")}>Учень не прийшов</button><button disabled={busy} className="btn secondary" onClick={() => open("teacher-late-cancellation")}>{role === "TEACHER" ? "Не можу провести (пізнє скасування)" : "Пізнє скасування викладача"}</button></>}
       {detail.capabilities.canUndoOutcome && <button disabled={busy} className="btn secondary danger-outline" onClick={() => open("undo-outcome")}>{undoOutcomeLabel}</button>}
       {journalHref && <Link className="btn secondary" href={journalHref}>Журнал учня</Link>}
     </div>
