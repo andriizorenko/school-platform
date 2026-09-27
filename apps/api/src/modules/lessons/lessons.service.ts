@@ -89,8 +89,8 @@ export class LessonsService {
       const now = new Date();
       const teacherMarkDeadlineHours = await numberSchoolSetting(tx, "teacher_mark_deadline_hours", 48);
       const cleanStreakReset = await numberSchoolSetting(tx, "policy_clean_streak_reset", 5);
-      if (now < session.ends_at) {
-        throw new ConflictException({ code: "LESSON_NOT_FINISHED", message: "Lesson can only be marked after it ends" });
+      if (now < session.starts_at) {
+        throw new ConflictException({ code: "LESSON_NOT_STARTED", message: "Lesson can only be marked after it starts" });
       }
 
       const privileged = actor.roles.some((role) => PRIVILEGED_MARK_ROLES.has(role));
