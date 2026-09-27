@@ -1298,6 +1298,18 @@ export class SchedulingService {
         const now = new Date();
         const isPastReschedule = requestedStart.getTime() <= now.getTime();
 
+        const advanceNoticeReasons = new Set(["STUDENT_ADVANCE_NOTICE", "TEACHER_ADVANCE_NOTICE"]);
+        if (!isPastReschedule && advanceNoticeReasons.has(dto.reason)) {
+          const lateNoticeCutoffMinutes = await numberSchoolSetting(tx, "lesson_late_notice_cutoff_minutes", 120);
+          const noticeMinutes = Math.floor((session.starts_at.getTime() - now.getTime()) / 60_000);
+          if (noticeMinutes < lateNoticeCutoffMinutes) {
+            throw new ConflictException({
+              code: "RESCHEDULE_ADVANCE_NOTICE_TOO_LATE",
+              message: `Advance notice requires at least ${lateNoticeCutoffMinutes} minutes before lesson start`,
+            });
+          }
+        }
+
         if (isPastReschedule) {
           if (dto.mode !== "MANUAL") {
             throw new BadRequestException({ code: "PAST_RESCHEDULE_REQUIRES_MANUAL_MODE", message: "Historical lesson time can only be set manually" });
@@ -1747,6 +1759,7 @@ export class SchedulingService {
     const now = Date.now();
     const teacherMarkDeadlineHours = await numberSchoolSetting(this.db, "teacher_mark_deadline_hours", 48);
     const parentRescheduleCutoffMinutes = await numberSchoolSetting(this.db, "parent_reschedule_cutoff_minutes", 120);
+    const lateNoticeCutoffMinutes = await numberSchoolSetting(this.db, "lesson_late_notice_cutoff_minutes", 120);
     const startsAt = new Date(row.starts_at);
     const endsAt = new Date(row.ends_at);
     const isActualTeacher = actor.roles.includes("TEACHER") && row.actual_teacher_id === actor.id;
@@ -1758,6 +1771,7 @@ export class SchedulingService {
     const hasRecordedOutcome = row.status === "COMPLETED" || row.status === "CHARGED_NO_SHOW" || Boolean(row.current_incident_type);
     const canUndoByRole = privileged || (isActualTeacher && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000);
     const canUndoOutcome = hasRecordedOutcome && actor.permissions.includes("lesson.outcome.undo") && canUndoByRole;
+    const lateNoticeWindowOpen = now >= startsAt.getTime() - lateNoticeCutoffMinutes * 60 * 1000;
 
     return {
       id: row.id,
@@ -1775,6 +1789,7 @@ export class SchedulingService {
       topicTitle: row.topic_title,
       homeworkAssigned: row.homework_assigned,
       needsReport: Boolean(row.needs_report),
+      lateNoticeCutoffMinutes,
       currentIncident: row.current_incident_type ? {
         type: row.current_incident_type,
         outcome: row.current_incident_outcome,
@@ -1785,7 +1800,7 @@ export class SchedulingService {
         canReschedule,
         canRescheduleToPast,
         canUndoOutcome,
-        canReportIncident: row.status === "SCHEDULED" && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
+        canReportIncident: row.status === "SCHEDULED" && !row.current_incident_type && lateNoticeWindowOpen && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
         canAssignSubstitute: row.status === "SCHEDULED" && privileged,
       },
     };
