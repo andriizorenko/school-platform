@@ -39,12 +39,13 @@ type SessionDetail = {
   homeworkAssigned?: boolean | null;
   needsReport: boolean;
   lateNoticeCutoffMinutes: number;
+  studentNoShowWaitMinutes: number;
   currentIncident?: {
     type: "STUDENT_NO_SHOW" | "TEACHER_LATE_CANCELLATION";
     outcome?: "RESCHEDULE_REQUIRED_NO_CHARGE" | "CHARGED_NO_SHOW" | "COMPENSATION_GRANTED" | null;
   } | null;
   balanceLessonUnits?: number | null;
-  capabilities: { canShowMark: boolean; canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canUndoOutcome: boolean; canReportIncident: boolean; canAssignSubstitute: boolean };
+  capabilities: { canShowMark: boolean; canMark: boolean; canReschedule: boolean; canRescheduleToPast: boolean; canUndoOutcome: boolean; canReportIncident: boolean; canReportStudentNoShow: boolean; canReportTeacherLateCancellation: boolean; canAssignSubstitute: boolean };
 };
 
 type FilterOptions = {
