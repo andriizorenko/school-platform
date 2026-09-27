@@ -1800,7 +1800,7 @@ export class SchedulingService {
         canReschedule,
         canRescheduleToPast,
         canUndoOutcome,
-        canReportIncident: row.status === "SCHEDULED" && !row.current_incident_type && lateNoticeWindowOpen && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
+        canReportIncident: row.status === "SCHEDULED" && row.session_type === "REGULAR" && row.funding_status === "PAID" && !row.current_incident_type && lateNoticeWindowOpen && actor.permissions.includes("lesson.incident.record") && (privileged || isActualTeacher),
         canAssignSubstitute: row.status === "SCHEDULED" && privileged,
       },
     };
