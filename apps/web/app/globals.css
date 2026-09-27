@@ -971,6 +971,43 @@ th { background: rgba(247,249,255,.74); }
   background: linear-gradient(145deg,rgba(244,247,255,.96),rgba(232,238,255,.82));
   box-shadow: 0 0 0 2px rgba(74,99,231,.08);
 }
+
+/* Compact, stable lesson action flow. */
+.session-action-form .action-form-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  margin: -8px -4px 2px;
+  padding: 9px 4px 8px;
+  background: rgba(249,251,255,.94);
+  border-bottom: 1px solid rgba(111,126,185,.10);
+  backdrop-filter: blur(14px) saturate(135%);
+}
+.session-action-form .choice-field legend { margin-bottom: 2px; }
+.reschedule-party-field {
+  grid-template-columns: repeat(auto-fit,minmax(118px,1fr));
+  gap: 7px;
+}
+.reschedule-party-field legend { grid-column: 1 / -1; }
+.reschedule-party-field .choice-card {
+  min-height: 62px;
+  padding: 9px 10px;
+  align-items: flex-start;
+}
+.reschedule-situation-field { gap: 7px; }
+.reschedule-situation-field .choice-card { padding: 9px 11px; }
+.session-action-form .choice-card .muted,
+.session-action-form .form-note { color: #59657d; }
+.session-action-form .choice-card.disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
+.session-action-form .choice-card.disabled:hover { border-color: rgba(111,126,185,.17); }
+
+@media (max-width: 420px) {
+  .reschedule-party-field { grid-template-columns: 1fr 1fr; }
+  .reschedule-party-field .choice-card { min-height: 58px; }
+}
 .free-slot-day {
   border-color: rgba(111,126,185,.14);
   background: rgba(249,251,255,.72);
