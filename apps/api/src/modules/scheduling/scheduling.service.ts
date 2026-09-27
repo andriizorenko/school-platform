@@ -1333,19 +1333,15 @@ export class SchedulingService {
           }
         }
 
-        if (isPastReschedule) {
-          if (dto.mode !== "MANUAL") {
-            throw new BadRequestException({ code: "PAST_RESCHEDULE_REQUIRES_MANUAL_MODE", message: "Historical lesson time can only be set manually" });
-          }
+        if (dto.mode === "MANUAL") {
           if (!(await this.canRescheduleToPast(actor, sessionId))) {
-            throw new ForbiddenException({ code: "PAST_RESCHEDULE_PERMISSION_REQUIRED", message: "You do not have permission to move lessons into the past" });
-          }
-          if (requestedEnd.getTime() > now.getTime()) {
-            throw new BadRequestException({ code: "PAST_RESCHEDULE_MUST_END_IN_PAST", message: "The entire lesson must end before the current time" });
+            throw new ForbiddenException({ code: "ADMIN_RESCHEDULE_PERMISSION_REQUIRED", message: "Administrative rescheduling requires the dedicated permission" });
           }
           if (!dto.comment?.trim()) {
-            throw new BadRequestException({ code: "PAST_RESCHEDULE_COMMENT_REQUIRED", message: "Add a comment explaining the historical correction" });
+            throw new BadRequestException({ code: "ADMIN_RESCHEDULE_COMMENT_REQUIRED", message: "Add a comment explaining the administrative reschedule" });
           }
+        } else if (isPastReschedule) {
+          throw new BadRequestException({ code: "PAST_RESCHEDULE_REQUIRES_MANUAL_MODE", message: "Historical lesson time can only be set through administrative rescheduling" });
         }
 
         const local = formatInSchoolTimeZone(requestedStart);
