@@ -53,7 +53,7 @@ function totp(secret: string, time = Date.now()) {
 async function login(page: Page, account: (typeof accounts)[keyof typeof accounts]) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
-  await page.getByLabel("Пароль").fill(account.password);
+  await page.getByLabel("Пароль", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Увійти" }).click();
 }
 
@@ -67,7 +67,7 @@ async function expectHome(page: Page, account: (typeof accounts)[keyof typeof ac
 test.describe.serial("role beta smoke", () => {
   test("Login password visibility is explicit and reversible", async ({ page }) => {
     await page.goto("/login");
-    const password = page.getByLabel("Пароль");
+    const password = page.getByLabel("Пароль", { exact: true });
     await password.fill(accounts.manager.password);
     await expect(password).toHaveAttribute("type", "password");
     await page.getByRole("button", { name: "Показати пароль" }).click();
