@@ -52,7 +52,7 @@ export function TimeSelect24({
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
     >
-      {!required && <option value="">—</option>}
+      <option value="" disabled={required}>{required ? "Оберіть час" : "—"}</option>
       {options.map((time) => <option key={time} value={time}>{time}</option>)}
     </select>
   );
