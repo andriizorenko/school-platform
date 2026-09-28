@@ -10,7 +10,22 @@ export const timeOnly = (value: string | Date) =>
 export const dateOnly = (value: string | Date) =>
   new Intl.DateTimeFormat("uk-UA", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Kyiv" }).format(new Date(value));
 
-/** Convert an HTML datetime-local value representing Europe/Kyiv wall time into an ISO instant. */
+/** Format an instant as a YYYY-MM-DDTHH:mm wall-clock value in Europe/Kyiv. */
+export function kyivLocalDateTimeValue(value: string | Date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+}
+
+/** Convert a Europe/Kyiv wall-clock value into an ISO instant. */
 export function kyivLocalDateTimeToIso(value: string) {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
   if (!m) throw new Error("Некоректний формат дати й часу");
