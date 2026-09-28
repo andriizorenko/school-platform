@@ -256,6 +256,7 @@ export class SchedulingService {
     student_id: string;
     actual_teacher_id: string;
     starts_at: Date;
+    ends_at: Date;
   }, actor: AuthUser) {
     const privileged = actor.roles.some((role) => PRIVILEGED_ROLES.has(role));
     const isTeacher = actor.roles.includes("TEACHER") && actor.id === session.actual_teacher_id;
@@ -285,7 +286,18 @@ export class SchedulingService {
       if (session.starts_at.getTime() - Date.now() < cutoffMs) {
         throw new ConflictException({
           code: "PARENT_RESCHEDULE_CUTOFF",
-          message: `Parents can reschedule only at least ${cutoffMinutes} minutes before the current lesson start`,
+          message: `Батьки можуть переносити заняття не пізніше ніж за ${cutoffMinutes} хвилин до його початку`,
+        });
+      }
+    }
+
+    if (isTeacher) {
+      const correctionWindowHours = await numberSchoolSetting(executor, "teacher_mark_deadline_hours", 48);
+      const correctionDeadline = session.ends_at.getTime() + correctionWindowHours * 60 * 60 * 1000;
+      if (Date.now() > correctionDeadline) {
+        throw new ConflictException({
+          code: "TEACHER_RESCHEDULE_WINDOW_EXPIRED",
+          message: `Вікно перенесення завершилось. Викладач може скоригувати заняття протягом ${correctionWindowHours} годин після його завершення`,
         });
       }
     }
@@ -1322,13 +1334,14 @@ export class SchedulingService {
         const isPastReschedule = requestedStart.getTime() <= now.getTime();
 
         const advanceNoticeReasons = new Set(["STUDENT_ADVANCE_NOTICE", "TEACHER_ADVANCE_NOTICE"]);
-        if (!isPastReschedule && advanceNoticeReasons.has(dto.reason)) {
+        const originalLessonHasNotStarted = now.getTime() < session.starts_at.getTime();
+        if (originalLessonHasNotStarted && !isPastReschedule && advanceNoticeReasons.has(dto.reason)) {
           const lateNoticeCutoffMinutes = await numberSchoolSetting(tx, "lesson_late_notice_cutoff_minutes", 120);
           const noticeMinutes = Math.floor((session.starts_at.getTime() - now.getTime()) / 60_000);
           if (noticeMinutes < lateNoticeCutoffMinutes) {
             throw new ConflictException({
               code: "RESCHEDULE_ADVANCE_NOTICE_TOO_LATE",
-              message: `Advance notice requires at least ${lateNoticeCutoffMinutes} minutes before lesson start`,
+              message: `Завчасне перенесення доступне не пізніше ніж за ${lateNoticeCutoffMinutes} хвилин до початку заняття`,
             });
           }
         }
@@ -1788,7 +1801,11 @@ export class SchedulingService {
     const withinTeacherWindow = now >= startsAt.getTime() && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
     const canShowMark = row.status === "SCHEDULED" && canMarkByPermission && markScopeAllowed;
     const canMark = canShowMark && row.funding_status === "PAID" && (privileged ? now >= startsAt.getTime() : withinTeacherWindow);
-    const canReschedule = row.status === "SCHEDULED" && actor.permissions.includes("lesson.reschedule") && (!actor.roles.includes("PARENT") || startsAt.getTime() - now >= parentRescheduleCutoffMinutes * 60 * 1000);
+    const teacherRescheduleWindowOpen = !isActualTeacher || now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000;
+    const canReschedule = row.status === "SCHEDULED"
+      && actor.permissions.includes("lesson.reschedule")
+      && teacherRescheduleWindowOpen
+      && (!actor.roles.includes("PARENT") || startsAt.getTime() - now >= parentRescheduleCutoffMinutes * 60 * 1000);
     const canRescheduleToPast = canReschedule && await this.canRescheduleToPast(actor, row.id);
     const hasRecordedOutcome = row.status === "COMPLETED" || row.status === "CHARGED_NO_SHOW" || Boolean(row.current_incident_type);
     const canUndoByRole = privileged || (isActualTeacher && now <= endsAt.getTime() + teacherMarkDeadlineHours * 60 * 60 * 1000);
