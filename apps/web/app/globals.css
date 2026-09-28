@@ -793,7 +793,11 @@ th { background: rgba(247,249,255,.74); }
 .mobile-nav {
   background: rgba(255,255,255,.84)!important;
   backdrop-filter: blur(18px) saturate(140%)!important;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
+.mobile-nav::-webkit-scrollbar { display: none; }
 .mobile-nav a {
   display: flex;
   flex-direction: column;
@@ -804,6 +808,7 @@ th { background: rgba(247,249,255,.74); }
   padding: 6px 9px;
   font-size: 10px;
   line-height: 1.15;
+  scroll-snap-align: center;
 }
 .mobile-nav-icon {
   width: 24px;
