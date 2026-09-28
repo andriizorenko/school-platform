@@ -140,7 +140,7 @@ test.describe.serial("role beta smoke", () => {
     const account = accounts.student;
     await login(page, account);
     await expectHome(page, account);
-    await expect(page.getByText("E2E Mathematics", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "E2E Mathematics" }).first()).toBeVisible();
     await page.getByRole("link", { name: "Журнал" }).first().click();
     await expect(page).toHaveURL(/\/student\/journal$/);
     await expect(page.getByText("E2E Mathematics", { exact: true })).toBeVisible();
