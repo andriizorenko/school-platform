@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { dateTime } from "../lib/format";
+import { dateTime, phoneNumber } from "../lib/format";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
 
@@ -28,6 +28,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [message, setMessage] = useState("");
+  const [reportError, setReportError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -73,11 +74,13 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
   async function completeReport(requestId: string) {
     const draft = drafts[requestId];
     if (!draft?.strengths.trim() || !draft.gaps.trim() || !draft.actionPlan.trim()) {
-      setMessage("Заповни всі три частини звіту.");
+      setMessage("");
+      setReportError("Заповни всі три частини звіту.");
       return;
     }
     setSaving(requestId);
     setMessage("");
+    setReportError("");
     try {
       await api(`/report-requests/${requestId}/complete`, {
         method: "POST",
@@ -90,7 +93,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
       setMessage("Звіт збережено та надіслано батькам.");
       await load();
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Не вдалося зберегти звіт");
+      setReportError(reason instanceof Error ? reason.message : "Не вдалося зберегти звіт");
     } finally {
       setSaving(null);
     }
@@ -100,20 +103,21 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
     {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : student && <div className="stack teacher-student-detail">
       <div className="page-head">
         <div>
-          <h1>{student.lastName} {student.firstName}</h1>
+          <h1 className="teacher-student-detail-name">{student.lastName} {student.firstName}</h1>
           <p className="muted">{student.gradeLevel ? `${student.gradeLevel} клас` : "Клас не вказано"}</p>
         </div>
         {(student.pendingReports?.length ?? 0) > 0 && <span className="report-alert">ТРЕБА ЗВІТ · {student.pendingReports.length}</span>}
       </div>
 
-      {message && <div className={message.includes("збережено") ? "success" : "notice-card"}>{message}</div>}
+      {reportError && <div className="error" role="alert">{reportError}</div>}
+      {message && <div className="success" role="status">{message}</div>}
 
       <div className="grid cols-2">
-        <div className="card">
+        <div className="card teacher-parent-contact-card">
           <h2>Контакт батьків</h2>
           <strong>{student.parent.lastName} {student.parent.firstName}</strong>
           <div className="teacher-contact-actions">
-            <a className="btn secondary" href={`tel:${student.parent.phone}`}>{student.parent.phone}</a>
+            <a className="btn secondary" href={`tel:${student.parent.phone}`}>{phoneNumber(student.parent.phone)}</a>
             {student.parent.telegramUsername && <a className="btn secondary" href={`https://t.me/${String(student.parent.telegramUsername).replace(/^@/, "")}`} target="_blank" rel="noreferrer">Telegram</a>}
           </div>
           <div className="muted">{student.parent.email}</div>
@@ -131,7 +135,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
         return <section className="card teacher-enrollment-card" key={enrollment.id}>
           <div className="page-head compact-page-head">
             <div>
-              <div className="row"><h2>{enrollment.subject.name}</h2>{!enrollment.activeForTeacher && <span className="badge">Архів</span>}{enrollment.status === "PAUSED" && <span className="badge">Пауза</span>}</div>
+              <div className="row"><h2 className="teacher-enrollment-title">{enrollment.subject.name}</h2>{!enrollment.activeForTeacher && <span className="badge">Архів</span>}{enrollment.status === "PAUSED" && <span className="badge">Пауза</span>}</div>
               <div className="muted">{scheduleText(enrollment.schedule)}</div>
             </div>
             {pending.length > 0 && <span className="report-alert">ТРЕБА ЗВІТ</span>}
@@ -161,7 +165,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
               <label className="field"><span>Що треба повторити</span><textarea className="textarea" value={drafts[request.id]?.gaps ?? ""} onChange={(event) => setDrafts((state) => ({ ...state, [request.id]: { ...(state[request.id] ?? { strengths: "", gaps: "", actionPlan: "" }), gaps: event.target.value } }))} /></label>
               <label className="field"><span>Подальший план</span><textarea className="textarea" value={drafts[request.id]?.actionPlan ?? ""} onChange={(event) => setDrafts((state) => ({ ...state, [request.id]: { ...(state[request.id] ?? { strengths: "", gaps: "", actionPlan: "" }), actionPlan: event.target.value } }))} /></label>
             </div>
-            <button className="btn" disabled={saving === request.id || request.targetSessionStatus !== "COMPLETED"} onClick={() => void completeReport(request.id)}>{saving === request.id ? "Зберігаю…" : request.targetSessionStatus === "COMPLETED" ? "Завершити звіт" : "Очікуємо заняття"}</button>
+            <button className="btn" disabled={Boolean(saving) || request.targetSessionStatus !== "COMPLETED"} onClick={() => void completeReport(request.id)}>{saving === request.id ? "Зберігаю…" : request.targetSessionStatus === "COMPLETED" ? "Завершити звіт" : "Очікуємо заняття"}</button>
           </div>)}
 
           <div id="journal" className="teacher-journal-section">

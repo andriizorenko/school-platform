@@ -241,7 +241,18 @@ tr:last-child td { border-bottom: 0; }
 .teacher-student-balance { display:flex; justify-content:space-between; gap:16px; align-items:center; }
 .teacher-student-last { font-size:13px; }
 .teacher-student-actions { justify-content:flex-end; margin-top:auto; }
-.teacher-student-detail { gap:18px; }
+.teacher-student-detail { gap:18px; min-width:0; }
+.teacher-student-detail .page-head > * { min-width:0; }
+.teacher-student-detail-name,
+.teacher-parent-contact-card strong,
+.teacher-parent-contact-card .muted,
+.teacher-enrollment-title,
+.report-request-heading > div,
+.report-history-card p,
+.journal-table td,
+.substitute-label { overflow-wrap:anywhere; }
+.teacher-parent-contact-card { min-width:0; }
+.teacher-contact-actions .btn { max-width:100%; overflow-wrap:anywhere; }
 .report-alert { display:inline-flex; align-items:center; border-radius:999px; padding:7px 10px; background:#fdf2fa; color:#c11574; font-weight:800; font-size:12px; letter-spacing:.02em; }
 .teacher-contact-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 8px; }
 .compact-page-head { margin-bottom:16px; }
