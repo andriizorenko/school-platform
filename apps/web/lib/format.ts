@@ -10,6 +10,19 @@ export const timeOnly = (value: string | Date) =>
 export const dateOnly = (value: string | Date) =>
   new Intl.DateTimeFormat("uk-UA", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Kyiv" }).format(new Date(value));
 
+/** Format an instant as a YYYY-MM-DD calendar date in Europe/Kyiv. */
+export function kyivDateValue(value: string | Date = new Date(), days = 0) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((item) => item.type === type)?.value ?? 0);
+  const date = new Date(Date.UTC(part("year"), part("month") - 1, part("day") + days));
+  return date.toISOString().slice(0, 10);
+}
+
 /** Format an instant as a YYYY-MM-DDTHH:mm wall-clock value in Europe/Kyiv. */
 export function kyivLocalDateTimeValue(value: string | Date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
