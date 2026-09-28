@@ -158,10 +158,13 @@ export function PlatformShell({ children, allowedRoles }: { children: React.Reac
       </Link>
 
       <nav className="nav glass-nav">
-        {nav.map((item) => <Link key={item.href} className={isActive(path, item.href) ? "active" : ""} href={item.href}>
-          <span className="nav-icon"><Glyph name={navGlyph(item)} /></span>
-          <span>{item.label}</span>
-        </Link>)}
+        {nav.map((item) => {
+          const active = isActive(path, item.href);
+          return <Link key={item.href} className={active ? "active" : ""} href={item.href} aria-current={active ? "page" : undefined}>
+            <span className="nav-icon"><Glyph name={navGlyph(item)} /></span>
+            <span>{item.label}</span>
+          </Link>;
+        })}
       </nav>
 
       <div className="sidebar-spacer" />
@@ -192,8 +195,17 @@ export function PlatformShell({ children, allowedRoles }: { children: React.Reac
     </section>
 
     <nav className="mobile-nav" aria-label="Навігація кабінету">
-      {nav.map((item) => <Link key={item.href} className={isActive(path, item.href) ? "active" : ""} href={item.href}>{item.label}</Link>)}
-      <Link className={path === "/profile" ? "active" : ""} href="/profile">Профіль</Link>
+      {nav.map((item) => {
+        const active = isActive(path, item.href);
+        return <Link key={item.href} className={active ? "active" : ""} href={item.href} aria-current={active ? "page" : undefined}>
+          <span className="mobile-nav-icon"><Glyph name={navGlyph(item)} /></span>
+          <span>{item.label}</span>
+        </Link>;
+      })}
+      <Link className={path === "/profile" ? "active" : ""} href="/profile" aria-current={path === "/profile" ? "page" : undefined}>
+        <span className="mobile-nav-icon"><Glyph name="users" /></span>
+        <span>Профіль</span>
+      </Link>
     </nav>
   </div>;
 }
