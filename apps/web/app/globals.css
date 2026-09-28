@@ -2026,6 +2026,21 @@ th { background: rgba(247,249,255,.74); }
   outline: 3px solid rgba(74,99,231,.16);
   outline-offset: 2px;
 }
+:where(.glass-nav a,.mobile-nav a,.profile-chip):focus-visible {
+  outline: 3px solid rgba(74,99,231,.16);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
 .sheet-close {
   display: grid;
   place-items: center;
