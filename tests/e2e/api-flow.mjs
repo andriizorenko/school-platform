@@ -156,6 +156,47 @@ async function run() {
   expectStatus(managerVacations, 200, "manager vacation queue");
   assert.ok(Array.isArray(managerVacations.payload), "manager vacation queue must return an array");
 
+  const [firstLessonStudents, firstLessonSubjects, firstLessonTeachers] = await Promise.all([
+    request("/ops/students?lifecycle=ACTIVE", { cookie: manager.cookie }),
+    request("/subjects", { cookie: manager.cookie }),
+    request("/teachers", { cookie: manager.cookie }),
+  ]);
+  expectStatus(firstLessonStudents, 200, "first lesson students");
+  expectStatus(firstLessonSubjects, 200, "first lesson subjects");
+  expectStatus(firstLessonTeachers, 200, "first lesson teachers");
+  const firstLessonStudent = firstLessonStudents.payload.find((item) => item.first_name === "E2E" && item.last_name === "Student");
+  const firstLessonSubject = firstLessonSubjects.payload.find((item) => item.slug === "e2e-mathematics");
+  const firstLessonTeacher = firstLessonTeachers.payload.find((item) => item.firstName === "E2E" && item.lastName === "Teacher");
+  assert.ok(firstLessonStudent?.id, "E2E first lesson student fixture missing");
+  assert.ok(firstLessonSubject?.id, "E2E first lesson subject fixture missing");
+  assert.ok(firstLessonTeacher?.userId, "E2E first lesson teacher fixture missing");
+
+  const firstLessonAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+  firstLessonAt.setUTCHours(10, 0, 0, 0);
+  const firstLessonBody = {
+    studentId: firstLessonStudent.id,
+    subjectId: firstLessonSubject.id,
+    teacherId: firstLessonTeacher.userId,
+    startsAt: firstLessonAt.toISOString(),
+  };
+  const createdFirstLesson = await request("/first-lessons", {
+    method: "POST",
+    cookie: manager.cookie,
+    body: firstLessonBody,
+  });
+  expectStatus(createdFirstLesson, 201, "create first lesson");
+  assert.equal(createdFirstLesson.payload?.sessionType, "FIRST");
+  assert.equal(createdFirstLesson.payload?.fundingStatus, "BOOKED");
+  assert.equal(createdFirstLesson.payload?.status, "SCHEDULED");
+
+  const firstLessonConflict = await request("/first-lessons", {
+    method: "POST",
+    cookie: manager.cookie,
+    body: firstLessonBody,
+  });
+  expectStatus(firstLessonConflict, 409, "first lesson teacher conflict");
+  assert.equal(firstLessonConflict.payload?.error?.code, "TEACHER_SESSION_CONFLICT");
+
   const teacher = await login(accounts.teacher);
   expectStatus(await request("/teachers/me/profile", { cookie: teacher.cookie }), 200, "teacher self profile");
   expectStatus(await request("/teachers/me/students", { cookie: teacher.cookie }), 200, "teacher students");
