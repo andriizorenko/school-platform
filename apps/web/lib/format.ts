@@ -2,10 +2,10 @@ export const money = (minor: number | string | null | undefined, currency = "UAH
   new Intl.NumberFormat("uk-UA", { style: "currency", currency, maximumFractionDigits: 2 }).format(Number(minor ?? 0) / 100);
 
 export const dateTime = (value: string | Date) =>
-  new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv" }).format(new Date(value));
+  new Intl.DateTimeFormat("uk-UA", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Kyiv", hourCycle: "h23" }).format(new Date(value));
 
 export const timeOnly = (value: string | Date) =>
-  new Intl.DateTimeFormat("uk-UA", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Kyiv" }).format(new Date(value));
+  new Intl.DateTimeFormat("uk-UA", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Kyiv", hourCycle: "h23" }).format(new Date(value));
 
 export const dateOnly = (value: string | Date) =>
   new Intl.DateTimeFormat("uk-UA", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Kyiv" }).format(new Date(value));
