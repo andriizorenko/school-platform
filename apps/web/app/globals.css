@@ -330,6 +330,25 @@ tr:last-child td { border-bottom: 0; }
 .parent-lesson-card .btn { justify-self: start; margin-top: 6px; }
 .parent-dashboard-actions { flex-wrap: wrap; }
 
+.students-filter-card {
+  margin-bottom: 16px;
+  align-items: flex-end;
+}
+.students-filter-search { flex: 1 1 300px; max-width: 380px; }
+.students-filter-select { flex: 0 1 220px; min-width: 180px; }
+.students-filter-mine {
+  min-height: 42px;
+  padding: 0 4px 2px;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .students-filter-card { align-items: stretch; }
+  .students-filter-search,
+  .students-filter-select { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .students-filter-mine { align-self: auto; }
+}
+
 .student-home-page { gap:18px; }
 .student-next-lesson-hero { display:flex; justify-content:space-between; gap:20px; align-items:center; background:linear-gradient(135deg,#fff,#f4f6ff); }
 .student-next-lesson-hero h2 { margin:5px 0; }
