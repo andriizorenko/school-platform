@@ -1519,6 +1519,24 @@ th { background: rgba(247,249,255,.74); }
 }
 
 
+/* Admin finance analytics */
+.admin-finance-filters { margin-bottom:16px; }
+.admin-finance-head > * { min-width:0; }
+.admin-finance-links,
+.admin-finance-presets { flex-wrap:wrap; }
+.finance-breakdown-card { min-width:0; }
+.finance-breakdown-card .lesson-row > span { min-width:0; overflow-wrap:anywhere; }
+.finance-breakdown-card .lesson-row > strong { flex:0 0 auto; font-variant-numeric:tabular-nums; }
+@media(max-width:700px){
+  .admin-finance-links { display:grid; grid-template-columns:1fr 1fr; }
+  .admin-finance-links .btn { width:100%; text-align:center; }
+  .admin-finance-presets { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .admin-finance-presets .btn { width:100%; padding-inline:8px; }
+}
+@media(max-width:480px){
+  .admin-finance-links { grid-template-columns:1fr; }
+}
+
 /* Guided refund workflow */
 .refund-sheet {
   width:min(520px,100%);
