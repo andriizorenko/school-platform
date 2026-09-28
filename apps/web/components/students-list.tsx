@@ -95,7 +95,7 @@ export function StudentsList({ role }: { role: "ADMIN" | "MANAGER" | "TEACHER" }
 
       {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : (
         <div className="table-wrap">
-          <table>
+          <table className="students-table">
             <thead>
               <tr>
                 <th>Учень</th>
