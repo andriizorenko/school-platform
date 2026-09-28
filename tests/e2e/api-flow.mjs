@@ -197,10 +197,75 @@ async function run() {
   expectStatus(firstLessonConflict, 409, "first lesson teacher conflict");
   assert.equal(firstLessonConflict.payload?.error?.code, "TEACHER_SESSION_CONFLICT");
 
+  const firstLessonId = createdFirstLesson.payload?.id;
+  assert.ok(firstLessonId, "create first lesson must return session id");
+
+  const firstLessonPayment = await request(`/sessions/${firstLessonId}/first-lesson/payment`, {
+    method: "POST",
+    cookie: manager.cookie,
+    body: { amountMinor: 15000, paymentMethod: "BANK_TRANSFER", note: "E2E first lesson lifecycle" },
+  });
+  expectStatus(firstLessonPayment, 201, "record first lesson payment");
+
+  const pastFirstLessonAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  pastFirstLessonAt.setUTCHours(12, 0, 0, 0);
+  const moveFirstLessonToPast = await request(`/sessions/${firstLessonId}/reschedule`, {
+    method: "POST",
+    cookie: admin.cookie,
+    body: {
+      startsAt: pastFirstLessonAt.toISOString(),
+      reason: "SCHOOL_REASON",
+      mode: "MANUAL",
+      comment: "E2E first lesson completion and undo",
+    },
+  });
+  expectStatus(moveFirstLessonToPast, 201, "move first lesson to past for completion");
+
   const teacher = await login(accounts.teacher);
   expectStatus(await request("/teachers/me/profile", { cookie: teacher.cookie }), 200, "teacher self profile");
   expectStatus(await request("/teachers/me/students", { cookie: teacher.cookie }), 200, "teacher students");
   expectStatus(await request("/settings", { cookie: teacher.cookie }), 403, "teacher settings denied");
+
+  const completedFirstLesson = await request(`/sessions/${firstLessonId}/first-lesson/complete`, {
+    method: "POST",
+    cookie: teacher.cookie,
+    body: {
+      strengths: "E2E strengths",
+      gaps: "E2E gaps",
+      actionPlan: "E2E action plan",
+      visibleToStudent: true,
+    },
+  });
+  expectStatus(completedFirstLesson, 201, "complete first lesson");
+  assert.equal(completedFirstLesson.payload?.session?.status, "COMPLETED");
+  assert.equal(completedFirstLesson.payload?.report?.reportType, "INITIAL");
+  assert.equal(completedFirstLesson.payload?.payrollAccrual?.type, "FIRST_LESSON");
+
+  const undoFirstLesson = await request(`/sessions/${firstLessonId}/outcome/undo`, {
+    method: "POST",
+    cookie: teacher.cookie,
+    body: { reason: "E2E verify first lesson undo" },
+  });
+  expectStatus(undoFirstLesson, 201, "undo first lesson outcome");
+  assert.equal(undoFirstLesson.payload?.ok, true);
+  assert.equal(undoFirstLesson.payload?.status, "SCHEDULED");
+
+  const firstLessonAfterUndo = await request(`/sessions/${firstLessonId}`, { cookie: teacher.cookie });
+  expectStatus(firstLessonAfterUndo, 200, "first lesson after undo");
+  assert.equal(firstLessonAfterUndo.payload?.status, "SCHEDULED");
+  assert.equal(firstLessonAfterUndo.payload?.fundingStatus, "PAID");
+
+  const restoreFirstLessonFuture = await request(`/sessions/${firstLessonId}/reschedule`, {
+    method: "POST",
+    cookie: admin.cookie,
+    body: {
+      startsAt: firstLessonAt.toISOString(),
+      reason: "SCHOOL_REASON",
+      mode: "MANUAL",
+      comment: "Restore E2E first lesson after undo lifecycle",
+    },
+  });
+  expectStatus(restoreFirstLessonFuture, 201, "restore first lesson future time");
 
   const parent = await login(accounts.parent);
   const parentDashboard = await request("/parent/dashboard", { cookie: parent.cookie });
