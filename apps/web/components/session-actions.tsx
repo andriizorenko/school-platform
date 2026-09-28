@@ -670,15 +670,19 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
   if (action === "admin-reschedule") {
     return (
-      <form className="stack session-action-form" onSubmit={(event) => { event.preventDefault(); void submitAdminReschedule(); }}>
+      <form className="stack session-action-form admin-reschedule-form" onSubmit={(event) => { event.preventDefault(); void submitAdminReschedule(); }}>
         <div className="row action-form-head">
           <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
           <strong>Адміністративне перенесення</strong>
         </div>
 
-        <div className="notice-card">
-          <strong>Ручне перенесення без часових обмежень.</strong>
-          <div className="muted" style={{marginTop:6}}>Можна вибрати минулий, поточний або майбутній час. Доступність викладача та конфлікти з іншими заняттями все одно перевіряються. Дія фіксується в аудиті.</div>
+        <div className="admin-reschedule-intro">
+          <div className="admin-reschedule-icon" aria-hidden="true">↻</div>
+          <div>
+            <div className="admin-reschedule-kicker">Службова дія</div>
+            <strong>Ручне перенесення без часових обмежень</strong>
+            <div className="muted" style={{marginTop:5}}>Можна вибрати минулий, поточний або майбутній час. Доступність викладача й конфлікти з іншими заняттями все одно перевіряються. Дія потрапляє в аудит.</div>
+          </div>
         </div>
 
         <DateTimeFields24
