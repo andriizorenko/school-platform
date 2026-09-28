@@ -670,6 +670,21 @@ body::before {
   border-color: rgba(74,99,231,.52);
   box-shadow: 0 0 0 3px rgba(74,99,231,.10);
 }
+.time-select-24 {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+.date-time-fields-24 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(120px, .75fr);
+  gap: 10px;
+  align-items: end;
+}
+.pricing-inline-form .date-time-fields-24 { grid-column: span 2; }
+@media (max-width: 640px) {
+  .date-time-fields-24 { grid-template-columns: 1fr; }
+  .pricing-inline-form .date-time-fields-24 { grid-column: 1 / -1; }
+}
 .table-wrap {
   border-color: rgba(113,128,183,.16);
   border-radius: 18px;
