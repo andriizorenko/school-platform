@@ -2,15 +2,21 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { kyivLocalDateTimeToIso } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 import { SchoolCalendar } from "./calendar";
 import { TimeSelect24 } from "./time-select-24";
 
 function localDate(days = 0) {
-  const value = new Date();
-  value.setDate(value.getDate() + days);
-  const adjusted = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return adjusted.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Kyiv",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const date = new Date(Date.UTC(value("year"), value("month") - 1, value("day") + days));
+  return date.toISOString().slice(0, 10);
 }
 
 export function FirstLessonsPage() {
@@ -49,7 +55,8 @@ export function FirstLessonsPage() {
     event.preventDefault();
     setBusy(true); setError(""); setMessage("");
     try {
-      const startsAt = new Date(`${form.date}T${form.time}:00`);
+      const startsAtIso = kyivLocalDateTimeToIso(`${form.date}T${form.time}`);
+      const startsAt = new Date(startsAtIso);
       if (!Number.isFinite(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
         setError("Оберіть майбутню дату й час.");
         return;
@@ -60,7 +67,7 @@ export function FirstLessonsPage() {
           studentId: form.studentId,
           subjectId: form.subjectId,
           teacherId: form.teacherId,
-          startsAt: startsAt.toISOString(),
+          startsAt: startsAtIso,
         }),
       });
       setMessage("Перший урок заплановано. Тепер зафіксуйте оплату до початку заняття.");
