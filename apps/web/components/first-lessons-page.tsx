@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { PlatformShell } from "./platform-shell";
 import { SchoolCalendar } from "./calendar";
+import { TimeSelect24 } from "./time-select-24";
 
 function localDate(days = 0) {
   const value = new Date();
@@ -85,7 +86,7 @@ export function FirstLessonsPage() {
         <div className="field"><label>Предмет *</label><select className="select" required value={form.subjectId} onChange={(event) => setForm({ ...form, subjectId: event.target.value, teacherId: "" })}><option value="">Оберіть предмет</option>{subjects.map((subject: any) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></div>
         <div className="field"><label>Викладач *</label><select className="select" required disabled={!form.subjectId} value={form.teacherId} onChange={(event) => setForm({ ...form, teacherId: event.target.value })}><option value="">Оберіть викладача</option>{teacherOptions.map((teacher: any) => <option key={teacher.userId} value={teacher.userId}>{teacher.lastName} {teacher.firstName}</option>)}</select></div>
         <div className="field"><label>Дата *</label><input className="input" type="date" min={localDate()} required value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></div>
-        <div className="field"><label>Час *</label><input className="input" type="time" step="1800" required value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} /></div>
+        <div className="field"><label>Час *</label><TimeSelect24 required value={form.time} onChange={(time) => setForm({ ...form, time })} /></div>
       </div>
       <p className="muted">Система перевірить предмет викладача, його доступність і конфлікти в календарі.</p>
       <button className="btn" disabled={busy || !form.studentId || !form.subjectId || !form.teacherId}>{busy ? "Плануємо…" : "Запланувати перший урок"}</button>
