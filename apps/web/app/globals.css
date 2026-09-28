@@ -452,6 +452,30 @@ tr:last-child td { border-bottom: 0; }
 
 /* Manager/Admin student enrollment operations. */
 .student-enrollment-card { display:grid; gap:18px; }
+.student-detail-page { min-width:0; }
+.student-detail-page .page-head > * { min-width:0; }
+.student-detail-name,
+.student-enrollment-title { overflow-wrap:anywhere; }
+.student-summary-grid > .card,
+.student-enrollment-facts > div { min-width:0; }
+.student-summary-grid strong,
+.student-summary-grid .muted,
+.student-summary-grid .card > div,
+.student-enrollment-facts strong { overflow-wrap:anywhere; }
+.student-enrollment-facts strong { display:block; line-height:1.4; }
+.student-balance-value { font-variant-numeric:tabular-nums; }
+.student-enrollment-empty { padding-block:24px; text-align:center; }
+.student-journal-table { min-width:720px; }
+.student-journal-table th:nth-child(2),
+.student-journal-table td:nth-child(2),
+.student-journal-table th:nth-child(4),
+.student-journal-table td:nth-child(4) {
+  min-width:220px;
+  max-width:420px;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.4;
+}
 .enrollment-management { border-top:1px solid var(--border); padding-top:14px; }
 .enrollment-management-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .management-sheet-body { margin-top:40px; }

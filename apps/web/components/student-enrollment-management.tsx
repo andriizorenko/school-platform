@@ -193,7 +193,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
 
     {mode && <div className="sheet-backdrop" onClick={() => !busy && setMode(null)}>
       <aside className={`sheet ${mode === "teacher" ? "wide-sheet" : ""}`} onClick={(event) => event.stopPropagation()}>
-        <button className="sheet-close" onClick={() => !busy && setMode(null)}>×</button>
+        <button type="button" className="sheet-close" aria-label="Закрити керування навчанням" disabled={busy} onClick={() => setMode(null)}>×</button>
         <div className="stack management-sheet-body">
           {error && <div className="error">{error}</div>}
 
@@ -221,7 +221,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
                 <select className="select" value={slot.dayOfWeek} onChange={(event) => patchSlot(index, { dayOfWeek: Number(event.target.value) })}>{Array.from({ length: 7 }, (_, i) => i + 1).map((day) => <option value={day} key={day}>{dayNames[day]}</option>)}</select>
                 <TimeSelect24 value={slot.startTime} onChange={(startTime) => patchSlot(index, { startTime })} />
                 <select className="select" value={slot.durationMinutes} onChange={(event) => patchSlot(index, { durationMinutes: Number(event.target.value) as 30 | 60 })}><option value={60}>60 хв</option><option value={30}>30 хв</option></select>
-                <button type="button" className="btn secondary" disabled={scheduleSlots.length === 1} onClick={() => setScheduleSlots((rows) => rows.filter((_, i) => i !== index))}>×</button>
+                <button type="button" className="btn secondary" aria-label={`Видалити регулярну годину ${index + 1}`} disabled={scheduleSlots.length === 1} onClick={() => setScheduleSlots((rows) => rows.filter((_, i) => i !== index))}>×</button>
               </div>)}
             </div>
             <button className="btn" disabled={busy}>{busy ? "Зберігаємо…" : "Зберегти новий графік"}</button>
