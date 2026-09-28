@@ -1101,6 +1101,21 @@ th { background: rgba(247,249,255,.74); }
 }
 
 
+/* First lesson scheduling surface */
+.first-lesson-form { margin-bottom:16px; min-width:0; }
+.first-lesson-fields > * { min-width:0; }
+.first-lesson-reference-status {
+  padding:10px 12px;
+  border:1px solid rgba(113,128,183,.14);
+  border-radius:12px;
+  background:rgba(247,249,255,.62);
+}
+.first-lesson-form-note { line-height:1.45; }
+.first-lesson-submit { justify-self:start; }
+@media(max-width:700px){
+  .first-lesson-submit { width:100%; }
+}
+
 /* Glass calendar + lesson action surfaces */
 .calendar-toolbar,
 .calendar-filters {

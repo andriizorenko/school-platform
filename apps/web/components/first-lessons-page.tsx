@@ -23,6 +23,7 @@ export function FirstLessonsPage() {
     time: "17:00",
   });
   const [calendarVersion, setCalendarVersion] = useState(0);
+  const [referencesLoading, setReferencesLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -36,7 +37,8 @@ export function FirstLessonsPage() {
       setStudents(studentRows);
       setSubjects(subjectRows.filter((item: any) => item.status === "ACTIVE"));
       setTeachers(teacherRows.filter((item: any) => item.teacherStatus === "ACTIVE" && !item.archivedAt));
-    }).catch((exception: any) => setError(exception?.message ?? "Не вдалося завантажити дані для першого уроку"));
+    }).catch((exception: any) => setError(exception?.message ?? "Не вдалося завантажити дані для першого уроку"))
+      .finally(() => setReferencesLoading(false));
   }, []);
 
   const teacherOptions = useMemo(() => teachers.filter((teacher: any) =>
@@ -76,19 +78,21 @@ export function FirstLessonsPage() {
       <div><h1>Перші уроки</h1><p className="muted">Заплануйте перше заняття, зафіксуйте оплату до початку та проконтролюйте звіт викладача.</p></div>
     </div>
 
-    <form className="card stack" onSubmit={submit} style={{ marginBottom: 16 }}>
+    <form className="card stack first-lesson-form" onSubmit={submit}>
       <div className="page-head compact-page-head"><h2>Запланувати перший урок</h2><span className="badge">60 хв</span></div>
-      {error && <div className="error">{error}</div>}
-      {message && <div className="success">{message}</div>}
-      <div className="grid cols-2">
-        <div className="field"><label htmlFor="first-lesson-student">Учень *</label><select id="first-lesson-student" className="select" required value={form.studentId} onChange={(event) => setForm({ ...form, studentId: event.target.value })}><option value="">Оберіть учня</option>{students.map((student: any) => <option key={student.id} value={student.id}>{student.last_name} {student.first_name}{student.grade_level ? ` · ${student.grade_level} клас` : ""}</option>)}</select></div>
-        <div className="field"><label htmlFor="first-lesson-subject">Предмет *</label><select id="first-lesson-subject" className="select" required value={form.subjectId} onChange={(event) => setForm({ ...form, subjectId: event.target.value, teacherId: "" })}><option value="">Оберіть предмет</option>{subjects.map((subject: any) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></div>
-        <div className="field"><label htmlFor="first-lesson-teacher">Викладач *</label><select id="first-lesson-teacher" className="select" required disabled={!form.subjectId} value={form.teacherId} onChange={(event) => setForm({ ...form, teacherId: event.target.value })}><option value="">Оберіть викладача</option>{teacherOptions.map((teacher: any) => <option key={teacher.userId} value={teacher.userId}>{teacher.lastName} {teacher.firstName}</option>)}</select></div>
+      {error && <div className="error" role="alert">{error}</div>}
+      {message && <div className="success" role="status">{message}</div>}
+      {referencesLoading && <div className="muted first-lesson-reference-status" role="status">Завантажуємо учнів, предмети та доступних викладачів…</div>}
+      <div className="grid cols-2 first-lesson-fields">
+        <div className="field"><label htmlFor="first-lesson-student">Учень *</label><select id="first-lesson-student" className="select" required disabled={referencesLoading} value={form.studentId} onChange={(event) => setForm({ ...form, studentId: event.target.value })}><option value="">{referencesLoading ? "Завантажуємо учнів…" : students.length ? "Оберіть учня" : "Немає активних учнів"}</option>{students.map((student: any) => <option key={student.id} value={student.id}>{student.last_name} {student.first_name}{student.grade_level ? ` · ${student.grade_level} клас` : ""}</option>)}</select></div>
+        <div className="field"><label htmlFor="first-lesson-subject">Предмет *</label><select id="first-lesson-subject" className="select" required disabled={referencesLoading} value={form.subjectId} onChange={(event) => setForm({ ...form, subjectId: event.target.value, teacherId: "" })}><option value="">{referencesLoading ? "Завантажуємо предмети…" : subjects.length ? "Оберіть предмет" : "Немає активних предметів"}</option>{subjects.map((subject: any) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></div>
+        <div className="field"><label htmlFor="first-lesson-teacher">Викладач *</label><select id="first-lesson-teacher" className="select" required disabled={referencesLoading || !form.subjectId || !teacherOptions.length} value={form.teacherId} onChange={(event) => setForm({ ...form, teacherId: event.target.value })}><option value="">{!form.subjectId ? "Спочатку оберіть предмет" : teacherOptions.length ? "Оберіть викладача" : "Немає активних викладачів"}</option>{teacherOptions.map((teacher: any) => <option key={teacher.userId} value={teacher.userId}>{teacher.lastName} {teacher.firstName}</option>)}</select></div>
         <div className="field"><label htmlFor="first-lesson-date">Дата *</label><input id="first-lesson-date" className="input" type="date" min={localDate()} required value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} /></div>
         <div className="field"><label htmlFor="first-lesson-time">Час *</label><TimeSelect24 id="first-lesson-time" required value={form.time} onChange={(time) => setForm({ ...form, time })} /></div>
       </div>
-      <p className="muted">Система перевірить предмет викладача, його доступність і конфлікти в календарі.</p>
-      <button className="btn" disabled={busy || !form.studentId || !form.subjectId || !form.teacherId}>{busy ? "Плануємо…" : "Запланувати перший урок"}</button>
+      {form.subjectId && !referencesLoading && !teacherOptions.length && <div className="warning-note">Для цього предмета немає активного викладача. Перевірте призначені предмети та статус викладачів.</div>}
+      <p className="muted first-lesson-form-note">Система перевірить предмет викладача, його доступність і конфлікти в календарі.</p>
+      <button className="btn first-lesson-submit" disabled={referencesLoading || busy || !form.studentId || !form.subjectId || !form.teacherId}>{busy ? "Плануємо…" : "Запланувати перший урок"}</button>
     </form>
 
     <SchoolCalendar key={calendarVersion} role="MANAGER" query="sessionType=FIRST" />
