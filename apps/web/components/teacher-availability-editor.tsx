@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { TimeSelect24 } from "./time-select-24";
 
 const dayNames = ["", "Понеділок", "Вівторок", "Середа", "Четвер", "Пʼятниця", "Субота", "Неділя"];
 const shortDayNames = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
@@ -244,9 +245,9 @@ export function TeacherAvailabilityEditor({
         </div>
         <div className="stack">
           {(grouped[day] ?? []).map(({ window, originalIndex }: any) => <div className="availability-row" key={`${day}-${originalIndex}`}>
-            <input className="input" type="time" step="1800" value={window.startTime} onChange={(event) => patch(originalIndex, "startTime", event.target.value)} />
+            <TimeSelect24 value={window.startTime} onChange={(value) => patch(originalIndex, "startTime", value)} />
             <span>—</span>
-            <input className="input" type="time" step="1800" value={window.endTime} onChange={(event) => patch(originalIndex, "endTime", event.target.value)} />
+            <TimeSelect24 value={window.endTime} onChange={(value) => patch(originalIndex, "endTime", value)} />
             <button className="btn secondary" type="button" onClick={() => remove(originalIndex)}>×</button>
           </div>)}
           {!(grouped[day] ?? []).length && <div className="muted">Не працюю</div>}
@@ -267,9 +268,9 @@ export function TeacherAvailabilityEditor({
         </label>
         {!exceptionAllDay && <div className="stack">
           {exceptionWindows.map((window, index) => <div className="availability-row" key={index}>
-            <input className="input" type="time" step="1800" value={window.startTime} onChange={(event) => setExceptionWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, startTime: event.target.value } : item))} />
+            <TimeSelect24 value={window.startTime} onChange={(value) => setExceptionWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, startTime: value } : item))} />
             <span>—</span>
-            <input className="input" type="time" step="1800" value={window.endTime} onChange={(event) => setExceptionWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, endTime: event.target.value } : item))} />
+            <TimeSelect24 value={window.endTime} onChange={(value) => setExceptionWindows((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, endTime: value } : item))} />
             <button className="btn secondary" type="button" onClick={() => setExceptionWindows((current) => current.filter((_, itemIndex) => itemIndex !== index))}>×</button>
           </div>)}
           <button className="btn secondary" type="button" onClick={() => setExceptionWindows((current) => [...current, { startTime: "10:00", endTime: "18:00" }])}>+ Інтервал</button>
