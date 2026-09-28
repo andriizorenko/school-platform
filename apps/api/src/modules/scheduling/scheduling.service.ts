@@ -1174,7 +1174,40 @@ export class SchedulingService {
         if (!this.isTeacherAvailable(availability, local.date, isoDayOfWeek(local.date), local.time, durationMinutes)) {
           throw new ConflictException({
             code: "TEACHER_NOT_AVAILABLE",
-            message: "Teacher is not available at the requested first-lesson time",
+            message: "Викладач недоступний у вибраний час першого уроку",
+          });
+        }
+
+        const conflictResult = await tx.execute(sql`
+          SELECT
+            EXISTS(
+              SELECT 1
+              FROM live_sessions
+              WHERE actual_teacher_id = ${dto.teacherId}
+                AND status IN ('SCHEDULED', 'COMPLETED', 'CHARGED_NO_SHOW')
+                AND starts_at < ${endsAt}
+                AND ends_at > ${startsAt}
+            ) AS teacher_conflict,
+            EXISTS(
+              SELECT 1
+              FROM live_sessions
+              WHERE student_id = ${dto.studentId}
+                AND status IN ('SCHEDULED', 'COMPLETED', 'CHARGED_NO_SHOW')
+                AND starts_at < ${endsAt}
+                AND ends_at > ${startsAt}
+            ) AS student_conflict
+        `);
+        const conflicts = conflictResult.rows[0] as { teacher_conflict: boolean; student_conflict: boolean };
+        if (conflicts.teacher_conflict) {
+          throw new ConflictException({
+            code: "TEACHER_SESSION_CONFLICT",
+            message: "У викладача вже є заняття в цей час",
+          });
+        }
+        if (conflicts.student_conflict) {
+          throw new ConflictException({
+            code: "STUDENT_SESSION_CONFLICT",
+            message: "В учня вже є заняття в цей час",
           });
         }
 
