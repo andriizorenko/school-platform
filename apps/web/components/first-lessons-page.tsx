@@ -2,21 +2,13 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { kyivLocalDateTimeToIso } from "../lib/format";
+import { kyivDateValue, kyivLocalDateTimeToIso } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 import { SchoolCalendar } from "./calendar";
 import { TimeSelect24 } from "./time-select-24";
 
 function localDate(days = 0) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Kyiv",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === type)?.value ?? 0);
-  const date = new Date(Date.UTC(value("year"), value("month") - 1, value("day") + days));
-  return date.toISOString().slice(0, 10);
+  return kyivDateValue(new Date(), days);
 }
 
 export function FirstLessonsPage() {
