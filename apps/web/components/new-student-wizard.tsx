@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type Me } from "../lib/api";
+import { kyivDateValue } from "../lib/format";
 import { TimeSelect24 } from "./time-select-24";
 import { TeacherScheduleMatcher } from "./teacher-schedule-matcher";
 
@@ -9,7 +10,7 @@ const dayNames = ["", "Понеділок", "Вівторок", "Середа", 
 type Slot = { dayOfWeek: number; startTime: string; durationMinutes: 30 | 60 };
 
 function todayDate() {
-  return new Date().toISOString().slice(0, 10);
+  return kyivDateValue();
 }
 
 export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; onDone: () => void }) {
