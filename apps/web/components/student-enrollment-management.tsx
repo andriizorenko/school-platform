@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { TimeSelect24 } from "./time-select-24";
 import { TeacherScheduleMatcher } from "./teacher-schedule-matcher";
 
 const dayNames = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
@@ -218,7 +219,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
               <div className="row" style={{ justifyContent: "space-between" }}><strong>Регулярні години</strong><button type="button" className="btn secondary" onClick={() => setScheduleSlots((rows) => [...rows, { dayOfWeek: 1, startTime: "17:00", durationMinutes: enrollment.defaultDurationMinutes as 30 | 60 }])}>+ Додати</button></div>
               {scheduleSlots.map((slot, index) => <div className="schedule-builder-row" key={index}>
                 <select className="select" value={slot.dayOfWeek} onChange={(event) => patchSlot(index, { dayOfWeek: Number(event.target.value) })}>{Array.from({ length: 7 }, (_, i) => i + 1).map((day) => <option value={day} key={day}>{dayNames[day]}</option>)}</select>
-                <input className="input" type="time" step="1800" value={slot.startTime} onChange={(event) => patchSlot(index, { startTime: event.target.value })} />
+                <TimeSelect24 value={slot.startTime} onChange={(startTime) => patchSlot(index, { startTime })} />
                 <select className="select" value={slot.durationMinutes} onChange={(event) => patchSlot(index, { durationMinutes: Number(event.target.value) as 30 | 60 })}><option value={60}>60 хв</option><option value={30}>30 хв</option></select>
                 <button type="button" className="btn secondary" disabled={scheduleSlots.length === 1} onClick={() => setScheduleSlots((rows) => rows.filter((_, i) => i !== index))}>×</button>
               </div>)}
