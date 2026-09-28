@@ -16,6 +16,8 @@ import {
   subjects,
   subjectPriceVersions,
   teacherAssignments,
+  teacherAvailabilityTemplates,
+  teacherAvailabilityWindows,
   teacherProfiles,
   teacherSubjects,
   userRoles,
@@ -222,6 +224,27 @@ async function runSeed() {
         target: [teacherSubjects.teacherId, teacherSubjects.subjectId],
         set: { isActive: true },
       });
+
+    for (const season of ["SCHOOL_YEAR", "SUMMER"] as const) {
+      const [template] = await db
+        .insert(teacherAvailabilityTemplates)
+        .values({ teacherId, season, isActive: true })
+        .onConflictDoUpdate({
+          target: [teacherAvailabilityTemplates.teacherId, teacherAvailabilityTemplates.season],
+          set: { isActive: true, updatedAt: new Date() },
+        })
+        .returning({ id: teacherAvailabilityTemplates.id });
+
+      await db.delete(teacherAvailabilityWindows).where(eq(teacherAvailabilityWindows.templateId, template.id));
+      await db.insert(teacherAvailabilityWindows).values(
+        Array.from({ length: 7 }, (_, index) => ({
+          templateId: template.id,
+          dayOfWeek: index + 1,
+          startTime: "00:00",
+          endTime: "23:59",
+        })),
+      );
+    }
 
     const [enrollment] = await db
       .insert(studentSubjectEnrollments)
