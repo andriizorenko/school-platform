@@ -42,24 +42,48 @@ export function TeachersList({ role }: { role: "ADMIN" | "MANAGER" }) {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card teachers-filter-card">
         <div className="grid cols-2">
-          <div className="field"><label>Пошук</label><input className="input" placeholder="ПІБ, телефон або email" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-          <div className="field"><label>Статус</label><select className="select" value={status} onChange={(e) => setStatus(e.target.value)}><option value="ACTIVE">Активні</option><option value="PENDING">Очікують активації</option><option value="SUSPENDED">Заблоковані</option><option value="ARCHIVED">Архів</option><option value="ALL">Усі</option></select></div>
+          <div className="field">
+            <label htmlFor="teachers-search">Пошук</label>
+            <input
+              id="teachers-search"
+              className="input"
+              type="search"
+              placeholder="ПІБ, телефон або email"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="teachers-status">Статус</label>
+            <select
+              id="teachers-status"
+              className="select"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="ACTIVE">Активні</option>
+              <option value="PENDING">Очікують активації</option>
+              <option value="SUSPENDED">Заблоковані</option>
+              <option value="ARCHIVED">Архів</option>
+              <option value="ALL">Усі</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : (
         <div className="grid cols-3">
           {rows.map((teacher) => (
-            <Link href={`/${role.toLowerCase()}/teachers/${teacher.userId}`} className="card" key={teacher.userId}>
+            <Link href={`/${role.toLowerCase()}/teachers/${teacher.userId}`} className="card teacher-list-card" key={teacher.userId}>
               <h2>{teacher.lastName} {teacher.firstName}</h2>
               <div className="muted">{teacher.phone}</div>
               <div className="muted">{teacher.email}</div>
-              <div className="row" style={{ marginTop: 12, flexWrap: "wrap" }}>
+              <div className="row teacher-list-subjects">
                 {teacher.subjects.filter((subject: any) => subject.isActive).map((subject: any) => <span className="badge" key={subject.id}>{subject.name}</span>)}
               </div>
-              <div className="row" style={{ marginTop: 12 }}>
+              <div className="row teacher-list-statuses">
                 <span className={`badge ${teacher.teacherStatus === "ACTIVE" ? "paid" : "booked"}`}>{statusLabel[teacher.teacherStatus] ?? teacher.teacherStatus}</span>
                 {teacher.userStatus !== "ACTIVE" && <span className="badge booked">{statusLabel[teacher.userStatus] ?? teacher.userStatus}</span>}
               </div>
