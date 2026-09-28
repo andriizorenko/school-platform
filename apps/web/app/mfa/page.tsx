@@ -16,6 +16,7 @@ function MfaFlow() {
   const [setup, setSetup] = useState<MfaSetup | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [recovery, setRecovery] = useState<string[]>([]);
   const [me, setMe] = useState<Me | null>(null);
 
@@ -55,6 +56,7 @@ function MfaFlow() {
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
       if (setup) {
@@ -74,6 +76,8 @@ function MfaFlow() {
       if (me) router.replace(roleHome(me.roles));
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : "Невірний код");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -125,11 +129,17 @@ function MfaFlow() {
             className="input"
             value={code}
             onChange={(event) => setCode(event.target.value)}
+            autoComplete="one-time-code"
+            inputMode={setup ? "numeric" : "text"}
+            autoCapitalize="none"
+            spellCheck={false}
             placeholder="123456"
             required
           />
         </div>
-        <button className="btn">Підтвердити</button>
+        <button className="btn" disabled={loading}>
+          {loading ? "Перевіряємо…" : "Підтвердити"}
+        </button>
       </form>
     </main>
   );
