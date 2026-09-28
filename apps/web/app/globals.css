@@ -733,6 +733,26 @@ th { background: rgba(247,249,255,.74); }
   background: rgba(255,255,255,.84)!important;
   backdrop-filter: blur(18px) saturate(140%)!important;
 }
+.mobile-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 66px;
+  padding: 6px 9px;
+  font-size: 10px;
+  line-height: 1.15;
+}
+.mobile-nav-icon {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.mobile-nav-icon svg { width: 17px; height: 17px; }
+.mobile-nav a.active .mobile-nav-icon { background: rgba(255,255,255,.74); }
 
 @media (max-width: 900px) {
   .glass-shell { display:block; padding:0; }
