@@ -75,7 +75,7 @@ export function FamiliesList({ role }: { role: "ADMIN" | "MANAGER" }) {
 
       {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : (
         <div className="table-wrap">
-          <table>
+          <table className="families-table">
             <thead>
               <tr>
                 <th>Сімʼя</th>
