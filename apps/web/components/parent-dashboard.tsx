@@ -1,7 +1,93 @@
 "use client";
+
 import Link from "next/link";
-import { PlatformShell } from "./platform-shell";
+import { dateTime, lessonCount, phoneNumber } from "../lib/format";
 import { useData } from "../lib/use-data";
 import { ErrorCard, LoadingCard } from "./loadable";
-import { dateTime, lessonCount, phoneNumber } from "../lib/format";
-export function ParentDashboard(){const{data,error,loading}=useData<any>("/parent/dashboard");return <PlatformShell allowedRoles={["PARENT"]}><div className="page-head"><div><h1>Вітаємо{data?.parent?.firstName?`, ${data.parent.firstName}`:""}</h1><p className="muted">Найближчі заняття, баланси дітей і навчання.</p></div></div>{loading?<LoadingCard/>:error?<ErrorCard error={error}/>:data&&<div className="stack"><div className="grid cols-2">{data.students.map((s:any)=><div className="card" key={s.id}><h2>{s.lastName} {s.firstName}</h2><div className="stack">{s.enrollments.map((e:any)=><div key={e.id} className="row" style={{justifyContent:"space-between"}}><div><strong>{e.subject.name}</strong><div className="muted">{e.primaryTeacher?`${e.primaryTeacher.lastName} ${e.primaryTeacher.firstName}`:"Без викладача"}</div></div><span className="badge">Залишилось: {lessonCount(e.balanceLessonUnits)}</span></div>)}</div>{s.primaryManager&&<div className="muted" style={{marginTop:14}}>Менеджер: {s.primaryManager.lastName} {s.primaryManager.firstName} · {phoneNumber(s.primaryManager.phone)}</div>}</div>)}</div><h2>Найближчі заняття</h2><div className="grid cols-3">{data.nextLessons.map((l:any)=><div className="card" key={l.id}><strong>{dateTime(l.starts_at??l.startsAt)}</strong><div>{l.subject_name??l.subjectName}</div><div className="muted">{l.student_first_name??""} {l.student_last_name??""}</div>{l.zoom_url&&<a className="btn" style={{display:"inline-block",marginTop:12}} href={l.zoom_url} target="_blank">Приєднатися до Zoom</a>}</div>)}</div><div className="row"><Link className="btn" href="/parent/schedule">Відкрити розклад</Link><Link className="btn secondary" href="/parent/learning">Навчання і звіти</Link><Link className="btn secondary" href="/parent/courses">Курси</Link></div></div>}</PlatformShell>}
+import { PlatformShell } from "./platform-shell";
+
+export function ParentDashboard() {
+  const { data, error, loading } = useData<any>("/parent/dashboard");
+
+  return (
+    <PlatformShell allowedRoles={["PARENT"]}>
+      <div className="page-head">
+        <div>
+          <h1>Вітаємо{data?.parent?.firstName ? `, ${data.parent.firstName}` : ""}</h1>
+          <p className="muted">Найближчі заняття, баланси дітей і навчання.</p>
+        </div>
+      </div>
+
+      {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : data && (
+        <div className="stack parent-dashboard">
+          {data.students.length ? (
+            <div className="grid cols-2 parent-dashboard-students">
+              {data.students.map((student: any) => (
+                <section className="card parent-student-card" key={student.id}>
+                  <h2>{student.lastName} {student.firstName}</h2>
+
+                  {student.enrollments.length ? (
+                    <div className="stack">
+                      {student.enrollments.map((enrollment: any) => (
+                        <div key={enrollment.id} className="row parent-enrollment-row">
+                          <div>
+                            <strong>{enrollment.subject.name}</strong>
+                            <div className="muted">
+                              {enrollment.primaryTeacher
+                                ? `${enrollment.primaryTeacher.lastName} ${enrollment.primaryTeacher.firstName}`
+                                : "Без викладача"}
+                            </div>
+                          </div>
+                          <span className="badge">Залишилось: {lessonCount(enrollment.balanceLessonUnits)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty compact-empty">Активних предметів поки немає.</div>
+                  )}
+
+                  {student.primaryManager && (
+                    <div className="muted parent-manager-note">
+                      Менеджер: {student.primaryManager.lastName} {student.primaryManager.firstName} · {phoneNumber(student.primaryManager.phone)}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="card empty">До цього акаунта ще не додано учнів.</div>
+          )}
+
+          <div className="parent-dashboard-section-head">
+            <h2>Найближчі заняття</h2>
+          </div>
+
+          {data.nextLessons.length ? (
+            <div className="grid cols-3">
+              {data.nextLessons.map((lesson: any) => (
+                <article className="card parent-lesson-card" key={lesson.id}>
+                  <strong>{dateTime(lesson.starts_at ?? lesson.startsAt)}</strong>
+                  <div>{lesson.subject_name ?? lesson.subjectName}</div>
+                  <div className="muted">{lesson.student_first_name ?? ""} {lesson.student_last_name ?? ""}</div>
+                  {lesson.zoom_url && (
+                    <a className="btn" href={lesson.zoom_url} target="_blank" rel="noreferrer">
+                      Приєднатися до Zoom
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="card empty">Майбутніх занять поки немає.</div>
+          )}
+
+          <div className="row parent-dashboard-actions">
+            <Link className="btn" href="/parent/schedule">Відкрити розклад</Link>
+            <Link className="btn secondary" href="/parent/learning">Навчання і звіти</Link>
+            <Link className="btn secondary" href="/parent/courses">Курси</Link>
+          </div>
+        </div>
+      )}
+    </PlatformShell>
+  );
+}
