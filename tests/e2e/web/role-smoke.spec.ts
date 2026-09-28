@@ -65,6 +65,18 @@ async function expectHome(page: Page, account: (typeof accounts)[keyof typeof ac
 }
 
 test.describe.serial("role beta smoke", () => {
+  test("Login password visibility is explicit and reversible", async ({ page }) => {
+    await page.goto("/login");
+    const password = page.getByLabel("Пароль");
+    await password.fill(accounts.manager.password);
+    await expect(password).toHaveAttribute("type", "password");
+    await page.getByRole("button", { name: "Показати пароль" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue(accounts.manager.password);
+    await page.getByRole("button", { name: "Сховати пароль" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+  });
+
   test("Admin completes first-time MFA and reaches dashboard", async ({ page }) => {
     const account = accounts.admin;
     await login(page, account);
@@ -84,6 +96,11 @@ test.describe.serial("role beta smoke", () => {
     await login(page, account);
     await expectHome(page, account);
     await expect(page.getByRole("heading", { name: "Головна менеджера" })).toBeVisible();
+    await page.goto("/manager/first-lessons");
+    await expect(page.getByRole("heading", { name: "Перші уроки" })).toBeVisible();
+    const firstLessonTime = page.getByLabel("Час *");
+    await expect(firstLessonTime).toHaveValue("17:00");
+    await expect(firstLessonTime.locator('option[value="18:00"]')).toHaveText("18:00");
     await page.goto("/admin/settings");
     await expect(page).toHaveURL(/\/manager$/);
     await page.goto("/manager/payments");
