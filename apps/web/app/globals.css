@@ -1949,3 +1949,91 @@ th { background: rgba(247,249,255,.74); }
   border-color: rgba(180,35,24,.46);
   background: #fff1f0;
 }
+
+
+/* Shared UI foundation polish */
+.btn,
+.icon-button,
+.sheet-close,
+.link-button,
+.slot-button,
+.choice-card {
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background-color .16s ease, color .16s ease, opacity .16s ease;
+}
+.btn {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(70,91,214,.18);
+}
+.btn.secondary:hover:not(:disabled) { box-shadow: 0 8px 20px rgba(53,72,136,.08); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled,
+.icon-button:disabled,
+.sheet-close:disabled { cursor: not-allowed; }
+
+.input,
+.select,
+.textarea {
+  min-height: 42px;
+  font: inherit;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.textarea {
+  min-height: 92px;
+  resize: vertical;
+  line-height: 1.45;
+}
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  background: rgba(244,246,251,.72);
+  color: #8a94aa;
+}
+.field > label,
+.choice-field > legend {
+  color: #667085;
+  font-weight: 720;
+  letter-spacing: -.005em;
+}
+:where(.btn,.icon-button,.sheet-close,.link-button,.slot-button,.choice-card):focus-visible {
+  outline: 3px solid rgba(74,99,231,.16);
+  outline-offset: 2px;
+}
+.sheet-close {
+  display: grid;
+  place-items: center;
+  background: rgba(247,249,255,.82);
+  border: 1px solid rgba(113,128,183,.14);
+  color: #59657d;
+  cursor: pointer;
+}
+.sheet-close:hover {
+  background: white;
+  color: var(--accent);
+  border-color: rgba(74,99,231,.24);
+}
+.sheet {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91,105,154,.28) transparent;
+}
+.sheet::-webkit-scrollbar { width: 8px; }
+.sheet::-webkit-scrollbar-track { background: transparent; }
+.sheet::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(91,105,154,.26);
+  background-clip: padding-box;
+}
+.login-card {
+  background: linear-gradient(145deg,rgba(255,255,255,.92),rgba(247,249,255,.82));
+  border-color: rgba(255,255,255,.92);
+  box-shadow: 0 24px 70px rgba(45,57,109,.14), inset 0 1px 0 rgba(255,255,255,.9);
+  backdrop-filter: blur(22px) saturate(135%);
+}
