@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type Me } from "../lib/api";
-import { dateOnly, dateTime } from "../lib/format";
+import { dateOnly, dateTime, kyivLocalDateTimeToIso, kyivLocalDateTimeValue } from "../lib/format";
+import { DateTimeFields24 } from "./date-time-fields-24";
 import { PlatformShell } from "./platform-shell";
 
 type PastRescheduleAccess = {
@@ -34,15 +35,11 @@ const roleLabel: Record<string, string> = {
   SUPPORT_MANAGER: "Техпідтримка",
 };
 
-function localDateTimeInput(date: Date) {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 function defaultPastAccessExpiry() {
   const date = new Date();
   date.setDate(date.getDate() + 30);
   date.setSeconds(0, 0);
-  return localDateTimeInput(date);
+  return kyivLocalDateTimeValue(date);
 }
 
 const statusLabel: Record<string, string> = {
@@ -76,7 +73,8 @@ export function TeamPage() {
   const [editRole, setEditRole] = useState("MANAGER");
   const [suspensionReason, setSuspensionReason] = useState("");
   const [pastAccess, setPastAccess] = useState<PastRescheduleAccess | null>(null);
-  const [pastAccessUntil, setPastAccessUntil] = useState(defaultPastAccessExpiry);
+  const [pastAccessDate, setPastAccessDate] = useState(() => defaultPastAccessExpiry().slice(0, 10));
+  const [pastAccessTime, setPastAccessTime] = useState(() => defaultPastAccessExpiry().slice(11, 16));
   const [pastAccessBusy, setPastAccessBusy] = useState(false);
 
   async function load() {
@@ -113,7 +111,9 @@ export function TeamPage() {
 
   useEffect(() => {
     setPastAccess(null);
-    setPastAccessUntil(defaultPastAccessExpiry());
+    const defaultExpiry = defaultPastAccessExpiry();
+    setPastAccessDate(defaultExpiry.slice(0, 10));
+    setPastAccessTime(defaultExpiry.slice(11, 16));
     if (!selected?.roles.includes("MANAGER")) return;
     let cancelled = false;
     api<PastRescheduleAccess>(`/staff/${selected.userId}/past-reschedule-access`)
@@ -186,14 +186,26 @@ export function TeamPage() {
     setPastAccessBusy(true);
     setError("");
     try {
-      const expiresAt = enabled ? new Date(pastAccessUntil) : null;
-      if (enabled && (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now())) {
-        setError("Вкажіть майбутню дату завершення додаткового доступу.");
-        return;
+      let expiresAt: string | null = null;
+      if (enabled) {
+        if (!pastAccessDate || !pastAccessTime) {
+          setError("Вкажіть майбутню дату завершення додаткового доступу.");
+          return;
+        }
+        try {
+          expiresAt = kyivLocalDateTimeToIso(`${pastAccessDate}T${pastAccessTime}`);
+        } catch {
+          setError("Вкажіть коректну дату й час завершення додаткового доступу.");
+          return;
+        }
+        if (new Date(expiresAt).getTime() <= Date.now()) {
+          setError("Вкажіть майбутню дату завершення додаткового доступу.");
+          return;
+        }
       }
       const access = await api<PastRescheduleAccess>(`/staff/${selected.userId}/past-reschedule-access`, {
         method: "PUT",
-        body: JSON.stringify({ enabled, expiresAt: enabled ? expiresAt!.toISOString() : undefined }),
+        body: JSON.stringify({ enabled, expiresAt: enabled ? expiresAt : undefined }),
       });
       setPastAccess(access);
       setMessage(enabled ? "Менеджеру надано право переносити уроки в минуле." : "Додаткове право менеджера відкликано.");
@@ -365,8 +377,18 @@ export function TeamPage() {
                     </>
                   ) : (
                     <>
-                      <div className="field"><label>Надати доступ до</label><input className="input" type="datetime-local" value={pastAccessUntil} onChange={(e)=>setPastAccessUntil(e.target.value)} disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy} /></div>
-                      <button className="btn secondary" disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy || !pastAccessUntil} onClick={()=>void updatePastRescheduleAccess(true)}>{pastAccessBusy ? "Зберігаємо…" : "Надати право"}</button>
+                      <DateTimeFields24
+                        idPrefix="past-reschedule-access"
+                        date={pastAccessDate}
+                        time={pastAccessTime}
+                        onDateChange={setPastAccessDate}
+                        onTimeChange={setPastAccessTime}
+                        dateLabel="Доступ до дати"
+                        timeLabel="До часу"
+                        required
+                        disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy}
+                      />
+                      <button className="btn secondary" disabled={selected.userStatus !== "ACTIVE" || pastAccessBusy || !pastAccessDate || !pastAccessTime} onClick={()=>void updatePastRescheduleAccess(true)}>{pastAccessBusy ? "Зберігаємо…" : "Надати право"}</button>
                     </>
                   )}
                 </section>
