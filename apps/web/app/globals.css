@@ -330,23 +330,31 @@ tr:last-child td { border-bottom: 0; }
 .parent-lesson-card .btn { justify-self: start; margin-top: 6px; }
 .parent-dashboard-actions { flex-wrap: wrap; }
 
-.students-filter-card {
+.students-filter-card,
+.families-filter-card {
   margin-bottom: 16px;
   align-items: flex-end;
 }
-.students-filter-search { flex: 1 1 300px; max-width: 380px; }
-.students-filter-select { flex: 0 1 220px; min-width: 180px; }
-.students-filter-mine {
+.students-filter-search,
+.families-filter-search { flex: 1 1 300px; max-width: 380px; }
+.students-filter-select,
+.families-filter-select { flex: 0 1 220px; min-width: 180px; }
+.students-filter-mine,
+.families-filter-mine {
   min-height: 42px;
   padding: 0 4px 2px;
   align-self: flex-end;
   white-space: nowrap;
 }
 @media (max-width: 640px) {
-  .students-filter-card { align-items: stretch; }
+  .students-filter-card,
+  .families-filter-card { align-items: stretch; }
   .students-filter-search,
-  .students-filter-select { flex: 1 1 100%; max-width: none; min-width: 0; }
-  .students-filter-mine { align-self: auto; }
+  .students-filter-select,
+  .families-filter-search,
+  .families-filter-select { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .students-filter-mine,
+  .families-filter-mine { align-self: auto; }
 }
 
 .student-home-page { gap:18px; }
