@@ -101,6 +101,13 @@ test.describe.serial("role beta smoke", () => {
     const firstLessonTime = page.getByLabel("Час *");
     await expect(firstLessonTime).toHaveValue("17:00");
     await expect(firstLessonTime.locator('option[value="18:00"]')).toHaveText("18:00");
+    await page.getByLabel("Учень *").selectOption({ label: "Student E2E · 7 клас" });
+    await page.getByLabel("Предмет *").selectOption({ label: "E2E Mathematics" });
+    await page.getByLabel("Викладач *").selectOption({ label: "Teacher E2E" });
+    await firstLessonTime.selectOption("22:00");
+    await page.getByRole("button", { name: "Запланувати перший урок" }).click();
+    await expect(page.getByText("Перший урок заплановано. Тепер зафіксуйте оплату до початку заняття.", { exact: true })).toBeVisible();
+    await expect(page.locator(".error")).toHaveCount(0);
     await page.goto("/admin/settings");
     await expect(page).toHaveURL(/\/manager$/);
     await page.goto("/manager/payments");
