@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
 import { useData } from "../lib/use-data";
+import { phoneNumber } from "../lib/format";
 
 const statusLabel: Record<string, string> = {
   ACTIVE: "Активний",
@@ -77,11 +78,11 @@ export function TeachersList({ role }: { role: "ADMIN" | "MANAGER" }) {
         <div className="grid cols-3">
           {rows.map((teacher) => (
             <Link href={`/${role.toLowerCase()}/teachers/${teacher.userId}`} className="card teacher-list-card" key={teacher.userId}>
-              <h2>{teacher.lastName} {teacher.firstName}</h2>
-              <div className="muted">{teacher.phone}</div>
-              <div className="muted">{teacher.email}</div>
+              <h2 className="teacher-list-name">{teacher.lastName} {teacher.firstName}</h2>
+              <div className="muted teacher-list-contact">{phoneNumber(teacher.phone)}</div>
+              <div className="muted teacher-list-contact">{teacher.email}</div>
               <div className="row teacher-list-subjects">
-                {teacher.subjects.filter((subject: any) => subject.isActive).map((subject: any) => <span className="badge" key={subject.id}>{subject.name}</span>)}
+                {teacher.subjects.filter((subject: any) => subject.isActive).map((subject: any) => <span className="badge teacher-list-subject-badge" key={subject.id}>{subject.name}</span>)}
               </div>
               <div className="row teacher-list-statuses">
                 <span className={`badge ${teacher.teacherStatus === "ACTIVE" ? "paid" : "booked"}`}>{statusLabel[teacher.teacherStatus] ?? teacher.teacherStatus}</span>
@@ -89,7 +90,7 @@ export function TeachersList({ role }: { role: "ADMIN" | "MANAGER" }) {
               </div>
             </Link>
           ))}
-          {!rows.length && <div className="empty">Викладачів за цими фільтрами не знайдено.</div>}
+          {!rows.length && <div className="empty teachers-empty-state">Викладачів за цими фільтрами не знайдено.</div>}
         </div>
       )}
     </PlatformShell>
