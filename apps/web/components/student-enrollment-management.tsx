@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
+import { kyivDateValue } from "../lib/format";
 import { TimeSelect24 } from "./time-select-24";
 import { TeacherScheduleMatcher } from "./teacher-schedule-matcher";
 
@@ -19,8 +20,7 @@ type Props = {
 };
 
 function dateOnly(date = new Date()) {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
+  return kyivDateValue(date);
 }
 
 function addDays(value: string, days: number) {
