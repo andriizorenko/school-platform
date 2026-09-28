@@ -3,6 +3,10 @@
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
 
 const errorMessages: Record<string, string> = {
+  TEACHER_NOT_AVAILABLE: "Викладач недоступний у вибраний час.",
+  TEACHER_SESSION_CONFLICT: "У викладача вже є інше заняття в цей час.",
+  STUDENT_SESSION_CONFLICT: "В учня вже є інше заняття в цей час.",
+  FIRST_LESSON_MUST_BE_FUTURE: "Перший урок можна запланувати лише на майбутній час.",
   INCIDENT_ALREADY_RECORDED_FOR_OCCURRENCE: "Для цього заняття подію вже зафіксовано. Спочатку перенесіть урок, а вже після нового запланованого часу можна фіксувати наступний інцидент.",
   TEACHER_RATE_NOT_CONFIGURED: "Для викладача немає чинної ставки з цього предмета на дату уроку. Додайте ставку в картці викладача й повторіть дію.",
   PAST_RESCHEDULE_PERMISSION_REQUIRED: "Немає права переносити уроки в минуле.",
