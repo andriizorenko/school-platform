@@ -3,6 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../../lib/api";
+import { PasswordInput } from "../../components/password-input";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -31,13 +32,13 @@ function ResetPasswordForm() {
       <form className="login-card stack" onSubmit={submit}>
         <h1>Новий пароль</h1>
         {error && <div className="error">{error}</div>}
-        <input
-          className="input"
-          type="password"
+        <PasswordInput
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
           minLength={8}
           required
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          ariaLabel="Пароль"
         />
         <button className="btn">Змінити пароль</button>
       </form>
