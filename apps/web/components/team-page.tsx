@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type Me } from "../lib/api";
-import { dateOnly, dateTime, kyivLocalDateTimeToIso, kyivLocalDateTimeValue } from "../lib/format";
+import { dateOnly, dateTime, kyivLocalDateTimeToIso, kyivLocalDateTimeValue, phoneNumber } from "../lib/format";
 import { DateTimeFields24 } from "./date-time-fields-24";
+import { LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
 
 type PastRescheduleAccess = {
@@ -59,6 +60,7 @@ export function TeamPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const [roleCode, setRole] = useState("MANAGER");
   const [email, setEmail] = useState("");
@@ -78,6 +80,7 @@ export function TeamPage() {
   const [pastAccessBusy, setPastAccessBusy] = useState(false);
 
   async function load() {
+    setLoading(true);
     try {
       const [{ user }, staff] = await Promise.all([
         api<{ user: Me }>("/auth/me"),
@@ -92,6 +95,8 @@ export function TeamPage() {
       setError("");
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -309,23 +314,36 @@ export function TeamPage() {
         </div>
       </div>
 
-      <div className="table-wrap">
-        <table>
+      {loading ? <LoadingCard /> : <div className="table-wrap">
+        <table className="team-table">
           <thead><tr><th>Працівник</th><th>Роль</th><th>Статус</th><th>Телефон</th><th>Відповідальність</th><th>Старт</th></tr></thead>
           <tbody>
             {filtered.map((row) => (
-              <tr key={row.userId} onClick={() => setSelected(row)} style={{ cursor: "pointer" }}>
-                <td><strong>{row.lastName} {row.firstName}</strong><br /><span className="muted">{row.email}</span></td>
+              <tr
+                className="team-table-row"
+                key={row.userId}
+                tabIndex={0}
+                aria-label={`Відкрити профіль: ${row.lastName} ${row.firstName}`}
+                onClick={() => setSelected(row)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelected(row);
+                  }
+                }}
+              >
+                <td className="team-person-cell"><strong>{row.lastName} {row.firstName}</strong><br /><span className="muted">{row.email}</span></td>
                 <td>{row.roles.map((role) => <span className="badge" key={role}>{roleLabel[role] ?? role}</span>)}</td>
                 <td><span className={`badge ${row.userStatus === "ACTIVE" ? "paid" : "booked"}`}>{statusLabel[row.userStatus] ?? row.userStatus}</span></td>
-                <td>{row.phone || "—"}</td>
+                <td className="team-phone-cell">{row.phone ? phoneNumber(row.phone) : "—"}</td>
                 <td>{row.roles.includes("MANAGER") ? `${row.activeManagedStudents} учнів` : "—"}</td>
                 <td>{dateOnly(row.startedAt)}</td>
               </tr>
             ))}
+            {!filtered.length && <tr><td className="team-empty-state" colSpan={6}>За цими фільтрами працівників не знайдено.</td></tr>}
           </tbody>
         </table>
-      </div>
+      </div>}
 
       {selected && (
         <div className="sheet-backdrop" onClick={() => setSelected(null)}>
