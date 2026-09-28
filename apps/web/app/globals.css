@@ -395,6 +395,24 @@ tr:last-child td { border-bottom: 0; }
 .teacher-list-statuses { margin-top: 12px; flex-wrap: wrap; }
 .teachers-empty-state { grid-column:1 / -1; }
 
+.teacher-detail-head > * { min-width:0; }
+.teacher-detail-name,
+.teacher-detail-contact,
+.teacher-detail-subject-row strong,
+.teacher-detail-subject-row .muted,
+.teacher-detail-student-card strong,
+.teacher-detail-student-subject,
+.teacher-detail-account-email { overflow-wrap:anywhere; }
+.teacher-detail-subject-row > div { min-width:0; }
+.teacher-detail-tabs { margin-bottom:16px; flex-wrap:wrap; }
+.teacher-detail-tabs .btn { flex:0 0 auto; }
+.teacher-detail-student-card { min-width:0; }
+.teacher-detail-empty { grid-column:1 / -1; }
+@media(max-width:700px){
+  .teacher-detail-tabs { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
+  .teacher-detail-tabs::-webkit-scrollbar { display:none; }
+}
+
 .student-home-page { gap:18px; }
 .student-next-lesson-hero { display:flex; justify-content:space-between; gap:20px; align-items:center; background:linear-gradient(135deg,#fff,#f4f6ff); }
 .student-next-lesson-hero h2 { margin:5px 0; }

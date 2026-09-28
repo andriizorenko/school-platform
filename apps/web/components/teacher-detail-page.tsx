@@ -2,11 +2,21 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, type Me } from "../lib/api";
-import { dateOnly, dateTime, money } from "../lib/format";
+import { dateOnly, dateTime, money, phoneNumber } from "../lib/format";
+import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
 import { TeacherAvailabilityEditor } from "./teacher-availability-editor";
 
 type Tab = "overview" | "students" | "availability" | "payroll" | "access" | "history";
+
+const statusLabel: Record<string, string> = {
+  ACTIVE: "Активний",
+  INVITED: "Запрошений",
+  ON_LEAVE: "У відпустці",
+  ARCHIVED: "Архів",
+  PENDING: "Очікує активації",
+  SUSPENDED: "Заблокований",
+};
 
 export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGER"; teacherId: string }) {
   const [me, setMe] = useState<Me | null>(null);
@@ -21,6 +31,7 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
   const [tab, setTab] = useState<Tab>("overview");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -93,10 +104,13 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
       setError("");
     } catch (e: any) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => {
+    setLoading(true);
     void load();
   }, [teacherId]);
 
@@ -229,25 +243,29 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
 
   const currentRateFor = (subjectId: string) => rates.filter((rate) => rate.subjectId === subjectId).at(-1);
   const availableSubjects = subjects.filter((subject) => !teacher?.subjects?.some((linked: any) => linked.id === subject.id && linked.isActive));
+  const allowedRoles = role === "ADMIN" ? ["ADMIN", "SUPPORT_MANAGER"] : ["MANAGER"];
+
+  if (loading) return <PlatformShell allowedRoles={allowedRoles}><LoadingCard /></PlatformShell>;
+  if (!teacher && error) return <PlatformShell allowedRoles={allowedRoles}><ErrorCard error={new Error(error)} /></PlatformShell>;
 
   return (
-    <PlatformShell allowedRoles={role === "ADMIN" ? ["ADMIN", "SUPPORT_MANAGER"] : ["MANAGER"]}>
-      <div className="page-head">
+    <PlatformShell allowedRoles={allowedRoles}>
+      <div className="page-head teacher-detail-head">
         <div>
-          <h1>{teacher ? `${teacher.lastName} ${teacher.firstName}` : "Викладач"}</h1>
-          <p className="muted">{teacher?.email} · {teacher?.phone}</p>
+          <h1 className="teacher-detail-name">{teacher ? `${teacher.lastName} ${teacher.firstName}` : "Викладач"}</h1>
+          <p className="muted teacher-detail-contact">{teacher?.email} · {phoneNumber(teacher?.phone)}</p>
         </div>
         <div className="row">
-          <span className={`badge ${teacher?.teacherStatus === "ACTIVE" ? "paid" : "booked"}`}>{teacher?.teacherStatus}</span>
-          <span className={`badge ${teacher?.userStatus === "ACTIVE" ? "paid" : "booked"}`}>{teacher?.userStatus}</span>
+          <span className={`badge ${teacher?.teacherStatus === "ACTIVE" ? "paid" : "booked"}`}>{statusLabel[teacher?.teacherStatus] ?? teacher?.teacherStatus}</span>
+          <span className={`badge ${teacher?.userStatus === "ACTIVE" ? "paid" : "booked"}`}>{statusLabel[teacher?.userStatus] ?? teacher?.userStatus}</span>
         </div>
       </div>
 
       {error && <div className="error">{error}</div>}
       {message && <div className="success">{message}</div>}
 
-      <div className="row" style={{ marginBottom: 16, flexWrap: "wrap" }}>
-        {tabs.map((item) => <button key={item.id} className={`btn ${tab === item.id ? "" : "secondary"}`} onClick={() => setTab(item.id)}>{item.label}</button>)}
+      <div className="row teacher-detail-tabs">
+        {tabs.map((item) => <button key={item.id} className={`btn ${tab === item.id ? "" : "secondary"}`} aria-pressed={tab === item.id} onClick={() => setTab(item.id)}>{item.label}</button>)}
       </div>
 
       {tab === "overview" && (
@@ -274,7 +292,7 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
                   <button className="btn secondary">Зберегти профіль</button>
                 </form>
               ) : (
-                <div className="stack"><div><strong>Телефон:</strong> {teacher?.phone}</div><div><strong>Працює з:</strong> {teacher?.startedAt ? dateOnly(teacher.startedAt) : "—"}</div>{teacher?.zoomUrl && <a className="btn secondary" href={teacher.zoomUrl} target="_blank">Відкрити Zoom</a>}</div>
+                <div className="stack"><div><strong>Телефон:</strong> {phoneNumber(teacher?.phone)}</div><div><strong>Працює з:</strong> {teacher?.startedAt ? dateOnly(teacher.startedAt) : "—"}</div>{teacher?.zoomUrl && <a className="btn secondary" href={teacher.zoomUrl} target="_blank">Відкрити Zoom</a>}</div>
               )}
             </section>
 
@@ -282,7 +300,7 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
               <h2>Предмети</h2>
               {(teacher?.subjects ?? []).map((subject: any) => {
                 const rate = currentRateFor(subject.id);
-                return <div className="session-row" key={subject.id}>
+                return <div className="session-row teacher-detail-subject-row" key={subject.id}>
                   <div><strong>{subject.name}</strong><div className="muted">{subject.isActive ? "Активний предмет" : "Вимкнений"}{canManageRates && rate ? ` · ${money(rate.rate60Minor, rate.currency)} / 60 хв` : ""}</div></div>
                   {canManageTeacher && <button className="btn secondary" onClick={() => void toggleSubject(subject.id, !subject.isActive)}>{subject.isActive ? "Вимкнути" : "Активувати"}</button>}
                 </div>;
@@ -307,9 +325,9 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
       )}
 
       {tab === "students" && (
-        <div className="grid cols-3">
-          {students.map((student: any) => <div className="card" key={student.id}><strong>{student.last_name} {student.first_name}</strong><div className="muted">{student.grade_level ? `${student.grade_level} клас` : ""}</div>{(student.enrollments ?? []).filter((enrollment: any) => enrollment.teacherId === teacherId || enrollment.teacher_id === teacherId).map((enrollment: any) => <div key={enrollment.id}>{enrollment.subjectName} · {enrollment.balanceLessonUnits} зан.</div>)}</div>)}
-          {!students.length && <div className="empty">Учнів не знайдено.</div>}
+        <div className="grid cols-3 teacher-detail-students-grid">
+          {students.map((student: any) => <div className="card teacher-detail-student-card" key={student.id}><strong>{student.last_name} {student.first_name}</strong><div className="muted">{student.grade_level ? `${student.grade_level} клас` : ""}</div>{(student.enrollments ?? []).filter((enrollment: any) => enrollment.teacherId === teacherId || enrollment.teacher_id === teacherId).map((enrollment: any) => <div className="teacher-detail-student-subject" key={enrollment.id}>{enrollment.subjectName} · {enrollment.balanceLessonUnits} зан.</div>)}</div>)}
+          {!students.length && <div className="empty teacher-detail-empty">Учнів не знайдено.</div>}
         </div>
       )}
 
@@ -347,8 +365,8 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
         <div className="grid cols-2">
           <section className="card stack">
             <h2>Акаунт</h2>
-            <div><strong>{teacher?.email}</strong></div>
-            <div className="row"><span className="badge">{teacher?.userStatus}</span><span className="badge">{teacher?.teacherStatus}</span></div>
+            <div className="teacher-detail-account-email"><strong>{teacher?.email}</strong></div>
+            <div className="row"><span className="badge">{statusLabel[teacher?.userStatus] ?? teacher?.userStatus}</span><span className="badge">{statusLabel[teacher?.teacherStatus] ?? teacher?.teacherStatus}</span></div>
             {teacher?.latestInvitation?.created_at && <div className="muted">Останнє запрошення: {dateTime(teacher.latestInvitation.created_at)}{teacher.latestInvitation.accepted_at ? " · прийнято" : ""}</div>}
             {canInvite && teacher?.userStatus === "PENDING" && <button className="btn secondary" onClick={invite}>Надіслати запрошення ще раз</button>}
             {canSuspend && teacher?.userStatus === "ACTIVE" && <><div className="field"><label>Причина блокування</label><input className="input" value={suspensionReason} onChange={(e) => setSuspensionReason(e.target.value)} /></div><button className="btn secondary" onClick={suspend} disabled={!suspensionReason.trim()}>Заблокувати акаунт</button></>}
