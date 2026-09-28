@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { dateOnly, timeOnly } from "../lib/format";
+import { dateOnly, kyivLocalDateTimeToIso, timeOnly } from "../lib/format";
+import { DateTimeFields24 } from "./date-time-fields-24";
 
 export type SessionActionRole = "ADMIN" | "MANAGER" | "TEACHER" | "PARENT" | "STUDENT";
 
@@ -96,7 +97,8 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
-  const [manualStartsAt, setManualStartsAt] = useState("");
+  const [manualDate, setManualDate] = useState("");
+  const [manualTime, setManualTime] = useState("");
   const [rescheduleAfterIncident, setRescheduleAfterIncident] = useState<null | "student-no-show" | "teacher-late-cancellation">(null);
   const [teacherCompensationGranted, setTeacherCompensationGranted] = useState(false);
   const [firstLessonAmount, setFirstLessonAmount] = useState("");
@@ -189,7 +191,8 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       setSlotDays(14);
       setSlotData(null);
       setSelectedSlot("");
-      setManualStartsAt("");
+      setManualDate("");
+      setManualTime("");
       setRescheduleComment("");
 
       if (detail.currentIncident?.type === "STUDENT_NO_SHOW") {
@@ -222,7 +225,8 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       }
     }
     if (next === "admin-reschedule") {
-      setManualStartsAt("");
+      setManualDate("");
+      setManualTime("");
       setRescheduleComment("");
     }
     if (next === "substitute") {
@@ -438,15 +442,21 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   }
 
   async function submitAdminReschedule() {
-    if (!manualStartsAt) { setError("Вкажіть нову дату та час."); return; }
-    if (!rescheduleComment.trim()) { setError("Для перенесення в минуле обовʼязково вкажіть причину в коментарі."); return; }
-    const startsAt = new Date(manualStartsAt);
-    if (Number.isNaN(startsAt.getTime())) { setError("Вкажіть коректну дату та час."); return; }
+    if (!manualDate || !manualTime) { setError("Вкажіть нову дату та час."); return; }
+    if (!rescheduleComment.trim()) { setError("Для адміністративного перенесення обовʼязково вкажіть причину."); return; }
+
+    let startsAt: string;
+    try {
+      startsAt = kyivLocalDateTimeToIso(`${manualDate}T${manualTime}`);
+    } catch {
+      setError("Вкажіть коректну дату та час.");
+      return;
+    }
 
     await finish(() => api(`/sessions/${detail.id}/reschedule`, {
       method: "POST",
       body: JSON.stringify({
-        startsAt: startsAt.toISOString(),
+        startsAt,
         reason: "SCHOOL_REASON",
         mode: "MANUAL",
         comment: rescheduleComment.trim(),
@@ -671,10 +681,16 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
           <div className="muted" style={{marginTop:6}}>Можна вибрати минулий, поточний або майбутній час. Доступність викладача та конфлікти з іншими заняттями все одно перевіряються. Дія фіксується в аудиті.</div>
         </div>
 
-        <div className="field">
-          <label>Нова дата й час початку</label>
-          <input className="input" type="datetime-local" required value={manualStartsAt} onChange={(event)=>setManualStartsAt(event.target.value)} />
-        </div>
+        <DateTimeFields24
+          idPrefix="admin-reschedule"
+          date={manualDate}
+          time={manualTime}
+          onDateChange={setManualDate}
+          onTimeChange={setManualTime}
+          dateLabel="Нова дата"
+          timeLabel="Новий час"
+          required
+        />
 
         <div className="field">
           <label>Причина перенесення *</label>
@@ -690,7 +706,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         </div>
 
         {error && <div className="error">{error}</div>}
-        <button className="btn" disabled={busy || !manualStartsAt || !rescheduleComment.trim()}>
+        <button className="btn" disabled={busy || !manualDate || !manualTime || !rescheduleComment.trim()}>
           {busy ? "Переносимо…" : "Перенести урок"}
         </button>
       </form>
