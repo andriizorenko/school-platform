@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { dateTime, money } from "../lib/format";
+import { dateTime, money, phoneNumber } from "../lib/format";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
 
@@ -145,7 +145,7 @@ export function FamilyOperationsPage({ familyId, role }: { familyId: string; rol
           <div className="page-head compact-page-head"><h2>Батьківський акаунт</h2><button className="btn secondary" onClick={() => setEditing((value) => !value)}>{editing ? "Скасувати" : "Редагувати"}</button></div>
           {!editing ? <>
             <strong>{data.family.parentLastName} {data.family.parentFirstName}</strong>
-            <div>{data.family.parentPhone}</div><div>{data.family.parentEmail}</div>
+            <div>{phoneNumber(data.family.parentPhone)}</div><div>{data.family.parentEmail}</div>
             <div className="row wrap-row"><span className="badge">{data.family.parentAccountStatus}</span><span className="muted">{invitationText(data.family)}</span></div>
             {!data.family.parentPasswordConfigured && !data.family.archivedAt && <button className="btn secondary" disabled={busy === `invite:${data.family.parentUserId}`} onClick={() => invite(data.family.parentUserId)}>{data.family.parentLastInvitationAt ? "Надіслати запрошення повторно" : "Надіслати запрошення"}</button>}
           </> : <form className="stack" onSubmit={saveParent}>
