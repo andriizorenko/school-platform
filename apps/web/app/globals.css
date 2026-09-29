@@ -2277,3 +2277,24 @@ th { background: rgba(247,249,255,.74); }
   box-shadow: 0 24px 70px rgba(45,57,109,.14), inset 0 1px 0 rgba(255,255,255,.9);
   backdrop-filter: blur(22px) saturate(135%);
 }
+
+
+/* Settings and audit: bounded operational data and keyboard access. */
+.settings-list, .settings-list > *, .setting-row > *, .settings-sheet > * { min-width:0; }
+.settings-list h2, .setting-row strong, .setting-value small, .settings-sheet { overflow-wrap:anywhere; }
+.setting-row .badge { flex-shrink:0; }
+.settings-sheet { align-content:start; grid-template-columns:minmax(0,1fr); }
+.settings-sheet > .sheet-close { justify-self:end; }
+.setting-history-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:12px 0 0; }
+.setting-history-values > div { min-width:0; padding:12px; background:var(--bg); border-radius:10px; }
+.setting-history-values dt { font-size:12px; font-weight:700; color:var(--muted); }
+.setting-history-values dd { margin:6px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow:auto; }
+.audit-table-wrap { max-width:100%; }
+.audit-table { table-layout:fixed; min-width:900px; }
+.audit-table th:first-child { width:165px; }
+.audit-table th:last-child { width:32%; }
+.audit-table td { white-space:normal; overflow-wrap:anywhere; vertical-align:top; }
+.audit-table summary { cursor:pointer; border-radius:6px; padding:6px 2px; color:var(--accent); font-weight:650; }
+.audit-table .audit-json { width:100%; max-width:100%; white-space:pre; overflow-wrap:normal; }
+:where(.setting-history-values dd,.audit-table-wrap,.audit-table summary,.audit-table .audit-json):focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
+@media(max-width:600px) { .setting-history-values { grid-template-columns:minmax(0,1fr); } }

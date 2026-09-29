@@ -16,21 +16,22 @@ export function AuditPage() {
       </div>
     </div>
 
-    {loading ? <LoadingCard /> : error ? <ErrorCard error={error} /> : !data?.length ? (
+    {loading ? <div role="status"><LoadingCard /></div> : error ? <div role="alert"><ErrorCard error={error} /></div> : !data?.length ? (
       <div className="card empty">Подій аудиту поки немає.</div>
     ) : (
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>Час</th><th>Хто</th><th>Дія</th><th>Сутність</th><th>Зміни</th></tr></thead>
+      <div className="table-wrap audit-table-wrap" role="region" aria-label="Події аудиту" tabIndex={0}>
+        <table className="audit-table" aria-label="Журнал аудиту">
+          <thead><tr><th scope="col">Час</th><th scope="col">Хто</th><th scope="col">Дія</th><th scope="col">Сутність</th><th scope="col">Зміни</th></tr></thead>
           <tbody>{data.map((item) => <tr key={item.id}>
-            <td>{dateTime(item.created_at)}</td>
+            <td><time dateTime={item.created_at}>{dateTime(item.created_at)}</time></td>
             <td>{item.actor_name || item.actor_email || "Система"}<br/><span className="muted">{item.actor_role}</span></td>
             <td><strong>{item.action}</strong></td>
             <td>{item.entity_type}</td>
-            <td><details><summary>Переглянути</summary><pre className="audit-json">{JSON.stringify({ before: item.before_data, after: item.after_data }, null, 2)}</pre></details></td>
+            <td><details><summary aria-label={`Переглянути зміни: ${item.action}, ${dateTime(item.created_at)}`}>Переглянути</summary><pre className="audit-json" tabIndex={0} role="region" aria-label="Дані до та після зміни">{JSON.stringify({ before: item.before_data, after: item.after_data }, null, 2)}</pre></details></td>
           </tr>)}</tbody>
         </table>
       </div>
     )}
   </PlatformShell>;
 }
+
