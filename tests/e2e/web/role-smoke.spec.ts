@@ -128,14 +128,46 @@ test.describe.serial("role beta smoke", () => {
     await expect(page.locator(".error")).toHaveCount(0);
   });
 
-  test("Parent sees linked student and learning navigation", async ({ page }) => {
+  test("Parent reviews family homework and retries a failed journal", async ({ page }) => {
     const account = accounts.parent;
     await login(page, account);
     await expectHome(page, account);
     await expect(page.getByText("Student E2E", { exact: false })).toBeVisible();
+
+    let journalAttempts = 0;
+    await page.route("**/api/enrollments/*/journal", async (route) => {
+      journalAttempts += 1;
+      if (journalAttempts === 1) {
+        await route.fulfill({ status: 503, json: { message: "Temporary error" } });
+        return;
+      }
+      await route.fulfill({ status: 200, json: [
+        { id: "parent-homework-open", lessonNumber: 1, startsAt: "2026-09-01T12:00:00.000Z",
+          topicTitle: "Fractions", homeworkAssigned: true, homeworkDescription: "Exercises 1–4", homeworkCompletedAt: null },
+        { id: "parent-homework-done", lessonNumber: 2, startsAt: "2026-09-02T12:00:00.000Z",
+          topicTitle: "Word problems", homeworkAssigned: true, homeworkDescription: "Exercises 5–8", homeworkCompletedAt: "2026-09-03T12:00:00.000Z" },
+      ] });
+    });
+
     await page.getByRole("link", { name: "Навчання" }).first().click();
     await expect(page).toHaveURL(/\/parent\/learning$/);
-    await expect(page.getByText("E2E Mathematics", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Домашні завдання дітей" })).toBeVisible();
+    await expect(page.getByText(/Не вдалося завантажити 1 журнал/)).toBeVisible();
+    await page.getByRole("button", { name: "Спробувати знову" }).click();
+    const open = page.getByRole("button", { name: /Потрібно виконати ·/ });
+    const done = page.getByRole("button", { name: /Учень позначив виконаним ·/ });
+    await expect(open).toContainText("· 1");
+    await expect(page.locator(".parent-homework-item").filter({ hasText: "Exercises 1–4" })).toBeVisible();
+    await expect(page.locator(".parent-homework-item").filter({ hasText: "Exercises 5–8" })).toHaveCount(0);
+    await done.click();
+    await expect(done).toContainText("· 1");
+    const completedTask = page.locator(".parent-homework-item").filter({ hasText: "Exercises 5–8" });
+    await expect(completedTask).toContainText("Учень позначив виконаним");
+    await expect(completedTask.getByRole("button")).toHaveCount(0);
+    await completedTask.getByRole("link", { name: "До журналу предмета" }).click();
+    await expect(page).toHaveURL(/#parent-journal-/);
+    await expect(page.locator(".error")).toHaveCount(0);
+
     await page.getByRole("link", { name: "Оплати" }).first().click();
     await expect(page).toHaveURL(/\/parent\/payments$/);
     await expect(page.getByText(/Онлайн-оплата:/)).toBeVisible();

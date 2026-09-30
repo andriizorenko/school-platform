@@ -283,6 +283,20 @@ tr:last-child td { border-bottom: 0; }
 
 /* Parent family learning hub: journals, report eligibility and visibility. */
 .parent-learning-page { gap: 24px; }
+.parent-homework-overview { display:grid; gap:16px; scroll-margin-top:24px; }
+.parent-homework-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.parent-homework-head > * { min-width:0; }
+.parent-homework-head h2 { margin-bottom:6px; }
+.parent-homework-child-filter { display:grid; gap:6px; flex:0 0 210px; font-weight:700; }
+.parent-homework-status-filter { justify-self:start; max-width:100%; overflow-x:auto; }
+.parent-homework-status-filter button { white-space:nowrap; }
+.parent-homework-list { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.parent-homework-item { min-width:0; padding:14px; border:1px solid var(--border); border-radius:12px; background:#fcfcfd; display:grid; gap:8px; overflow-wrap:anywhere; }
+.parent-homework-meta { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
+.parent-homework-item > .link-button { justify-self:start; }
+.parent-homework-more { justify-self:start; }
+.parent-homework-overview .error .btn { margin-left:12px; }
+.parent-journal-section { scroll-margin-top:24px; }
 .parent-learning-summary .metric { font-size: 26px; }
 .parent-learning-student { display: grid; gap: 14px; }
 .parent-learning-student-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 0 2px; }
@@ -298,6 +312,8 @@ tr:last-child td { border-bottom: 0; }
 .parent-journal-section, .parent-reports-section { display: grid; gap: 12px; }
 .parent-report-toggle { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--border); }
 @media(max-width:900px){
+  .parent-homework-head { flex-direction:column; }
+  .parent-homework-child-filter { flex:0 1 auto; width:100%; }
   .parent-learning-summary { grid-template-columns: 1fr!important; }
   .parent-subject-head, .parent-report-request-box { align-items: stretch; flex-direction: column; }
   .parent-subject-balance { text-align: left; min-width: 0; }

@@ -10,6 +10,11 @@ export function ParentLearningPage(){
   const[reports,setReports]=useState<Record<string,any[]>>({});
   const[eligibility,setEligibility]=useState<Record<string,any[]>>({});
   const[journals,setJournals]=useState<Record<string,any[]>>({});
+  const[journalErrors,setJournalErrors]=useState<string[]>([]);
+  const[retryingJournals,setRetryingJournals]=useState(false);
+  const[homeworkStudentId,setHomeworkStudentId]=useState("ALL");
+  const[homeworkFilter,setHomeworkFilter]=useState<"OPEN"|"DONE">("OPEN");
+  const[expandedHomework,setExpandedHomework]=useState(false);
   const[expanded,setExpanded]=useState<Record<string,boolean>>({});
   const[requestVisibility,setRequestVisibility]=useState<Record<string,boolean>>({});
   const[busy,setBusy]=useState<string|null>(null);
@@ -24,12 +29,29 @@ export function ParentLearningPage(){
       const reportEntries=await Promise.all((d.students??[]).map(async(s:any)=>[s.id,await api<any[]>(`/students/${s.id}/reports`).catch(()=>[])] as const));
       const eligibilityEntries=await Promise.all((d.students??[]).map(async(s:any)=>[s.id,await api<any[]>(`/students/${s.id}/reports/eligibility`).catch(()=>[])] as const));
       const allEnrollments=(d.students??[]).flatMap((s:any)=>s.enrollments??[]);
-      const journalEntries=await Promise.all(allEnrollments.map(async(e:any)=>[e.id,await api<any[]>(`/enrollments/${e.id}/journal`).catch(()=>[])] as const));
-      setDash(d);setReports(Object.fromEntries(reportEntries));setEligibility(Object.fromEntries(eligibilityEntries));setJournals(Object.fromEntries(journalEntries));
+      const journalEntries=await Promise.all(allEnrollments.map(async(e:any)=>{
+        try{return{id:e.id,rows:await api<any[]>(`/enrollments/${e.id}/journal`),failed:false}}
+        catch{return{id:e.id,rows:[] as any[],failed:true}}
+      }));
+      setDash(d);setReports(Object.fromEntries(reportEntries));setEligibility(Object.fromEntries(eligibilityEntries));setJournals(Object.fromEntries(journalEntries.map(({id,rows})=>[id,rows])));
+      setJournalErrors(journalEntries.filter(({failed})=>failed).map(({id})=>id));
       setRequestVisibility(current=>{const next={...current};for(const enrollment of allEnrollments)if(next[enrollment.id]===undefined)next[enrollment.id]=true;return next});
     }catch(e:any){setError(e.message)}finally{setLoading(false)}
   }
   useEffect(()=>{void load()},[]);
+
+  async function retryFailedJournals(){
+    if(retryingJournals||!journalErrors.length)return;
+    setRetryingJournals(true);
+    try{
+      const results=await Promise.all(journalErrors.map(async(id)=>{
+        try{return{id,rows:await api<any[]>(`/enrollments/${id}/journal`),failed:false}}
+        catch{return{id,rows:[] as any[],failed:true}}
+      }));
+      setJournals(current=>({...current,...Object.fromEntries(results.filter(({failed})=>!failed).map(({id,rows})=>[id,rows]))}));
+      setJournalErrors(results.filter(({failed})=>failed).map(({id})=>id));
+    }finally{setRetryingJournals(false)}
+  }
 
   async function request(studentId:string,enrollment:any){
     setBusy(`request:${enrollment.id}`);setError("");setMsg("");
@@ -54,6 +76,16 @@ export function ParentLearningPage(){
   }
 
   const totalEnrollments=(dash?.students??[]).reduce((sum:number,s:any)=>sum+(s.enrollments?.length??0),0);
+  const homeworkEntries=(dash?.students??[]).flatMap((student:any)=>(student.enrollments??[]).flatMap((enrollment:any)=>
+    (journals[enrollment.id]??[]).filter((entry:any)=>entry.homeworkAssigned).map((entry:any)=>({
+      ...entry,studentId:student.id,studentName:`${student.lastName} ${student.firstName}`,
+      enrollmentId:enrollment.id,subjectName:enrollment.subject.name,
+    }))
+  )).sort((a:any,b:any)=>new Date(b.startsAt).getTime()-new Date(a.startsAt).getTime());
+  const childHomework=homeworkStudentId==="ALL"?homeworkEntries:homeworkEntries.filter((entry:any)=>entry.studentId===homeworkStudentId);
+  const openHomeworkCount=childHomework.filter((entry:any)=>!entry.homeworkCompletedAt).length;
+  const filteredHomework=childHomework.filter((entry:any)=>homeworkFilter==="OPEN"?!entry.homeworkCompletedAt:Boolean(entry.homeworkCompletedAt));
+  const visibleHomework=expandedHomework?filteredHomework:filteredHomework.slice(0,6);
   return <PlatformShell allowedRoles={["PARENT"]}>
     <div className="page-head"><div><h1>Навчання сімʼї</h1><p className="muted">Журнали, прогрес і звіти по всіх дітях та предметах в одному місці.</p></div></div>
     {error&&<div className="error">{error}</div>}{msg&&<div className="success">{msg}</div>}
@@ -63,6 +95,34 @@ export function ParentLearningPage(){
         <div className="card"><div className="muted">Предметів</div><div className="metric">{totalEnrollments}</div></div>
         <div className="card"><div className="muted">Готових звітів</div><div className="metric">{Object.values(reports).reduce((sum:number,items:any)=>sum+(items?.length??0),0)}</div></div>
       </div>
+
+      <section className="card parent-homework-overview" id="homework" aria-labelledby="parent-homework-title">
+        <div className="parent-homework-head">
+          <div><h2 id="parent-homework-title">Домашні завдання дітей</h2><p className="muted">Усі призначені завдання та позначки виконання від учнів.</p></div>
+          {(dash?.students?.length??0)>1&&<label className="parent-homework-child-filter">Дитина
+            <select className="input" value={homeworkStudentId} onChange={event=>{setHomeworkStudentId(event.target.value);setExpandedHomework(false)}}>
+              <option value="ALL">Усі діти</option>
+              {(dash?.students??[]).map((student:any)=><option key={student.id} value={student.id}>{student.lastName} {student.firstName}</option>)}
+            </select>
+          </label>}
+        </div>
+        {journalErrors.length>0?<div className="error" role="alert">
+          Не вдалося завантажити {journalErrors.length} {journalErrors.length===1?"журнал":"журналів"}. Список завдань може бути неповним.
+          <button type="button" className="btn secondary" disabled={retryingJournals} onClick={()=>void retryFailedJournals()}>{retryingJournals?"Повторюємо…":"Спробувати знову"}</button>
+        </div>:<>
+          <div className="segmented parent-homework-status-filter" role="group" aria-label="Фільтр домашніх завдань">
+            <button type="button" className={homeworkFilter==="OPEN"?"active":""} aria-pressed={homeworkFilter==="OPEN"} onClick={()=>{setHomeworkFilter("OPEN");setExpandedHomework(false)}}>Потрібно виконати · {openHomeworkCount}</button>
+            <button type="button" className={homeworkFilter==="DONE"?"active":""} aria-pressed={homeworkFilter==="DONE"} onClick={()=>{setHomeworkFilter("DONE");setExpandedHomework(false)}}>Учень позначив виконаним · {childHomework.length-openHomeworkCount}</button>
+          </div>
+          {visibleHomework.length?<ul className="parent-homework-list">{visibleHomework.map((entry:any)=><li className="parent-homework-item" key={entry.id}>
+            <div className="parent-homework-meta"><strong>{entry.studentName} · {entry.subjectName}</strong><span className="muted">{dateTime(entry.startsAt)}</span></div>
+            <div><strong>Тема:</strong> {entry.topicTitle||"Не вказана"}</div>
+            <HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} />
+            <a className="link-button" href={`#parent-journal-${entry.enrollmentId}`}>До журналу предмета</a>
+          </li>)}</ul>:<div className="empty compact-empty">{homeworkFilter==="OPEN"?"Завдань, які потрібно виконати, немає.":"Учні ще не позначили завдання виконаними."}</div>}
+          {filteredHomework.length>6&&<button className="btn secondary parent-homework-more" type="button" onClick={()=>setExpandedHomework(current=>!current)}>{expandedHomework?"Згорнути":`Показати всі · ${filteredHomework.length}`}</button>}
+        </>}
+      </section>
 
       {(dash?.students??[]).map((student:any)=><section className="parent-learning-student" key={student.id}>
         <div className="parent-learning-student-head">
@@ -84,9 +144,10 @@ export function ParentLearningPage(){
               {gate?.status==="AVAILABLE"&&<div className="parent-report-request-actions"><label className="row parent-report-visibility"><input type="checkbox" checked={requestVisibility[enrollment.id]!==false} onChange={event=>setRequestVisibility(state=>({...state,[enrollment.id]:event.target.checked}))}/> Показати готовий звіт дитині</label><button className="btn" disabled={busy===`request:${enrollment.id}`} onClick={()=>void request(student.id,enrollment)}>{busy===`request:${enrollment.id}`?"Надсилаю…":"Запросити звіт"}</button></div>}
             </div>
 
-            <div className="parent-journal-section">
+            <div className="parent-journal-section" id={`parent-journal-${enrollment.id}`}>
               <div className="section-heading row"><div><h3>Журнал</h3><p className="muted">Проведені заняття, теми та домашні завдання.</p></div>{journal.length>5&&<button className="btn secondary" onClick={()=>setExpanded(state=>({...state,[enrollment.id]:!state[enrollment.id]}))}>{expanded[enrollment.id]?"Згорнути":`Усі заняття · ${journal.length}`}</button>}</div>
-              {visibleJournal.length?<div className="table-wrap"><table className="journal-table"><thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead><tbody>{visibleJournal.map((entry:any)=><tr key={entry.id}><td>{entry.lessonNumber}</td><td>{dateTime(entry.startsAt)}</td><td>{entry.topicTitle||"—"}</td><td><HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} /></td><td>{entry.isSubstitute?<span className="substitute-label">Провів: {entry.actualTeacherFullName}</span>:<span className="muted">—</span>}</td></tr>)}</tbody></table></div>:<div className="empty compact-empty">Проведених занять ще немає.</div>}
+              {journalErrors.includes(enrollment.id)&&<div className="error">Журнал тимчасово недоступний. Повторіть завантаження в розділі «Домашні завдання дітей».</div>}
+              {!journalErrors.includes(enrollment.id)&&visibleJournal.length?<div className="table-wrap"><table className="journal-table"><thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead><tbody>{visibleJournal.map((entry:any)=><tr key={entry.id}><td>{entry.lessonNumber}</td><td>{dateTime(entry.startsAt)}</td><td>{entry.topicTitle||"—"}</td><td><HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} /></td><td>{entry.isSubstitute?<span className="substitute-label">Провів: {entry.actualTeacherFullName}</span>:<span className="muted">—</span>}</td></tr>)}</tbody></table></div>:!journalErrors.includes(enrollment.id)?<div className="empty compact-empty">Проведених занять ще немає.</div>:null}
             </div>
 
             <div className="parent-reports-section">
