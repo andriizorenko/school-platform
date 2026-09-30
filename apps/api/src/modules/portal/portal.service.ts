@@ -75,6 +75,7 @@ export class PortalService {
 
     const nextLessons = await this.db.execute(sql`
       SELECT ls.id, ls.student_id, ls.starts_at, ls.ends_at, ls.session_type, ls.funding_status,
+             st.first_name AS student_first_name, st.last_name AS student_last_name,
              sub.name AS subject_name, tp.first_name AS teacher_first_name, tp.last_name AS teacher_last_name, tp.zoom_url
       FROM live_sessions ls
       JOIN students st ON st.id = ls.student_id
@@ -85,6 +86,19 @@ export class PortalService {
         AND ls.starts_at > now()
       ORDER BY ls.starts_at ASC
       LIMIT 10
+    `);
+
+    const recentReschedules = await this.db.execute(sql`
+      SELECT r.id, r.session_id, r.from_start_at, r.to_start_at, r.created_at,
+             st.first_name AS student_first_name, st.last_name AS student_last_name,
+             sub.name AS subject_name
+      FROM session_reschedules r
+      JOIN live_sessions ls ON ls.id = r.session_id
+      JOIN students st ON st.id = ls.student_id
+      JOIN subjects sub ON sub.id = ls.subject_id
+      WHERE st.family_id = ${parent.family_id}
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT 5
     `);
 
     const enrollmentsByStudent = new Map<string, any[]>();
@@ -133,6 +147,7 @@ export class PortalService {
         enrollments: enrollmentsByStudent.get(student.id) ?? [],
       })),
       nextLessons: nextLessons.rows,
+      recentReschedules: recentReschedules.rows,
     };
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { dateTime, lessonCount, phoneNumber } from "../lib/format";
+import { dateTime, kyivDateValue, lessonCount, phoneNumber } from "../lib/format";
 import { useData } from "../lib/use-data";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
@@ -68,7 +68,9 @@ export function ParentDashboard() {
                 <article className="card parent-lesson-card" key={lesson.id}>
                   <strong>{dateTime(lesson.starts_at ?? lesson.startsAt)}</strong>
                   <div>{lesson.subject_name ?? lesson.subjectName}</div>
-                  <div className="muted">{lesson.student_first_name ?? ""} {lesson.student_last_name ?? ""}</div>
+                  <div className="muted">{lesson.student_first_name} {lesson.student_last_name}</div>
+                  <div className="muted">Викладач: {lesson.teacher_last_name} {lesson.teacher_first_name}</div>
+                  <Link className="btn secondary" href={`/parent/schedule?sessionId=${lesson.id}&date=${kyivDateValue(lesson.starts_at ?? lesson.startsAt)}`}>Деталі та перенесення</Link>
                   {lesson.zoom_url && (
                     <a className="btn" href={lesson.zoom_url} target="_blank" rel="noreferrer">
                       Приєднатися до Zoom
@@ -80,6 +82,26 @@ export function ParentDashboard() {
           ) : (
             <div className="card empty">Майбутніх занять поки немає.</div>
           )}
+
+          <section className="stack" aria-labelledby="parent-reschedules-title">
+            <div className="parent-dashboard-section-head">
+              <h2 id="parent-reschedules-title">Останні перенесення</h2>
+            </div>
+            {data.recentReschedules?.length ? (
+              <div className="grid cols-2">
+                {data.recentReschedules.map((item: any) => (
+                  <article className="card" key={item.id}>
+                    <strong>{item.subject_name} · {item.student_first_name} {item.student_last_name}</strong>
+                    <div className="muted">Було: {dateTime(item.from_start_at)}</div>
+                    <div>Стало: {dateTime(item.to_start_at)}</div>
+                    <div className="muted">Перенесено: {dateTime(item.created_at)}</div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="card empty">Перенесень ще не було.</div>
+            )}
+          </section>
 
           <div className="row parent-dashboard-actions">
             <Link className="btn" href="/parent/schedule">Відкрити розклад</Link>

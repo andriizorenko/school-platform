@@ -164,6 +164,22 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
   const fixedQuery = useMemo(() => new URLSearchParams(query), [query]);
 
   useEffect(() => {
+    if (role !== "PARENT") return;
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("sessionId");
+    if (!sessionId || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sessionId)) return;
+    const linkedDate = params.get("date");
+    if (linkedDate && /^\d{4}-\d{2}-\d{2}$/.test(linkedDate)) {
+      const [year, month, day] = linkedDate.split("-").map(Number);
+      const date = new Date(year, month - 1, day);
+      if (date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day) {
+        setAnchor(date);
+      }
+    }
+    setSelected({ id: sessionId });
+  }, [role]);
+
+  useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
     const apply = () => {
       if (!viewportResolved.current) {

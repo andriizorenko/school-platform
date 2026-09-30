@@ -271,6 +271,13 @@ async function run() {
   const parentDashboard = await request("/parent/dashboard", { cookie: parent.cookie });
   expectStatus(parentDashboard, 200, "parent dashboard");
   assert.ok(parentDashboard.payload?.students?.length >= 1, "parent fixture must expose at least one linked student");
+  const parentFirstLesson = parentDashboard.payload.nextLessons.find((item) => item.id === firstLessonId);
+  assert.equal(parentFirstLesson?.student_first_name, "E2E", "upcoming lesson must identify the child");
+  assert.equal(parentFirstLesson?.student_last_name, "Student");
+  assert.ok(
+    parentDashboard.payload.recentReschedules?.some((item) => item.session_id === firstLessonId && item.from_start_at && item.to_start_at),
+    "parent must see a completed reschedule for their child's lesson",
+  );
 
   const parentCourses = await request("/portal/courses", { cookie: parent.cookie });
   expectStatus(parentCourses, 200, "parent course portal");
