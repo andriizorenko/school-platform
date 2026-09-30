@@ -279,6 +279,20 @@ async function run() {
     "parent must see a completed reschedule for their child's lesson",
   );
 
+  const firstReschedulePage = await request("/parent/reschedules?limit=1", { cookie: parent.cookie });
+  expectStatus(firstReschedulePage, 200, "parent reschedule history");
+  assert.equal(firstReschedulePage.payload?.items?.length, 1);
+  assert.ok(firstReschedulePage.payload.items[0].session_id === firstLessonId, "history must stay in the parent's family");
+  assert.ok(firstReschedulePage.payload.nextCursor, "two reschedules should span two pages");
+  const nextReschedulePage = await request(
+    `/parent/reschedules?limit=1&before=${encodeURIComponent(firstReschedulePage.payload.nextCursor)}`,
+    { cookie: parent.cookie },
+  );
+  expectStatus(nextReschedulePage, 200, "parent reschedule history next page");
+  assert.equal(nextReschedulePage.payload?.items?.length, 1);
+  assert.notEqual(nextReschedulePage.payload.items[0].id, firstReschedulePage.payload.items[0].id);
+  expectStatus(await request("/parent/reschedules?before=invalid", { cookie: parent.cookie }), 400, "invalid reschedule cursor");
+
   const parentCourses = await request("/portal/courses", { cookie: parent.cookie });
   expectStatus(parentCourses, 200, "parent course portal");
   assert.ok(Array.isArray(parentCourses.payload), "parent course portal must return an array");
@@ -552,6 +566,7 @@ async function run() {
   const studentCourses = await request("/portal/courses", { cookie: student.cookie });
   expectStatus(studentCourses, 200, "student course portal");
   assert.ok(Array.isArray(studentCourses.payload), "student course portal must return an array");
+  expectStatus(await request("/parent/reschedules", { cookie: student.cookie }), 403, "student cannot see parent reschedule history");
   const studentAsParent = await request("/parent/dashboard", { cookie: student.cookie });
   expectStatus(studentAsParent, 403, "student cannot use parent dashboard");
   assert.equal(studentAsParent.payload?.error?.code, "PARENT_PORTAL_ONLY");

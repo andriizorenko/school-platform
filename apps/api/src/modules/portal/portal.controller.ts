@@ -1,4 +1,4 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, Query } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { AuthUser } from "../auth/types";
 import { RequirePermissions } from "../iam/require-permissions.decorator";
@@ -12,6 +12,16 @@ export class PortalController {
   @Get("parent/dashboard")
   parentDashboard(@CurrentUser() user: AuthUser) {
     return this.portal.parentDashboard(user);
+  }
+
+  @RequirePermissions("student.view")
+  @Get("parent/reschedules")
+  parentReschedules(
+    @CurrentUser() user: AuthUser,
+    @Query("before") before?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.portal.parentReschedules(user, before, limit);
   }
 
   @RequirePermissions("lesson.balance.view")

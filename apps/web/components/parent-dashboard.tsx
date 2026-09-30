@@ -86,6 +86,7 @@ export function ParentDashboard() {
           <section className="stack" aria-labelledby="parent-reschedules-title">
             <div className="parent-dashboard-section-head">
               <h2 id="parent-reschedules-title">Останні перенесення</h2>
+              <Link className="btn secondary" href="/parent/reschedules">Уся історія</Link>
             </div>
             {data.recentReschedules?.length ? (
               <div className="grid cols-2">

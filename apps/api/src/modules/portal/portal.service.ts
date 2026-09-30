@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Database } from "@school/db";
 import { DATABASE } from "../../common/database/database.constants";
 import type { AuthUser } from "../auth/types";
@@ -148,6 +148,62 @@ export class PortalService {
       })),
       nextLessons: nextLessons.rows,
       recentReschedules: recentReschedules.rows,
+    };
+  }
+
+  async parentReschedules(actor: AuthUser, before?: string, limit?: string) {
+    if (!actor.roles.includes("PARENT")) {
+      throw new ForbiddenException({ code: "PARENT_PORTAL_ONLY", message: "Reschedule history is available only to a parent account" });
+    }
+
+    const pageSize = limit === undefined ? 20 : Number(limit);
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 50) {
+      throw new BadRequestException({ code: "INVALID_RESCHEDULE_PAGE_SIZE", message: "Limit must be an integer from 1 to 50" });
+    }
+
+    let cursorAt: string | null = null;
+    let cursorId: string | null = null;
+    if (before !== undefined) {
+      if (before.length > 160 || !/^[A-Za-z0-9_-]+$/.test(before)
+        || Buffer.from(before, "base64url").toString("base64url") !== before) {
+        throw new BadRequestException({ code: "INVALID_RESCHEDULE_CURSOR", message: "Invalid history cursor" });
+      }
+      const decoded = Buffer.from(before, "base64url").toString("utf8").split("|");
+      if (decoded.length !== 2
+        || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(decoded[0])
+        || !Number.isFinite(Date.parse(decoded[0]))
+        || !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(decoded[1])) {
+        throw new BadRequestException({ code: "INVALID_RESCHEDULE_CURSOR", message: "Invalid history cursor" });
+      }
+      [cursorAt, cursorId] = decoded;
+    }
+
+    const family = await this.db.execute(sql`SELECT family_id FROM parent_profiles WHERE user_id=${actor.id} LIMIT 1`);
+    if (!family.rowCount) throw new NotFoundException({ code: "PARENT_PROFILE_NOT_FOUND", message: "Parent profile not found" });
+    const familyId = (family.rows[0] as any).family_id;
+
+    const result = await this.db.execute(sql`
+      SELECT r.id, r.session_id, r.from_start_at, r.to_start_at, r.created_at,
+             to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at,
+             st.first_name AS student_first_name, st.last_name AS student_last_name,
+             sub.name AS subject_name
+      FROM session_reschedules r
+      JOIN live_sessions ls ON ls.id = r.session_id
+      JOIN students st ON st.id = ls.student_id
+      JOIN subjects sub ON sub.id = ls.subject_id
+      WHERE st.family_id = ${familyId}
+        ${cursorAt && cursorId ? sql`AND (r.created_at, r.id) < (${cursorAt}::timestamptz, ${cursorId}::uuid)` : sql``}
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT ${pageSize + 1}
+    `);
+    const rows = result.rows as any[];
+    const visible = rows.slice(0, pageSize);
+    const last = visible.at(-1);
+    return {
+      items: visible.map(({ cursor_at, ...item }) => item),
+      nextCursor: rows.length > pageSize && last
+        ? Buffer.from(`${last.cursor_at}|${last.id}`, "utf8").toString("base64url")
+        : null,
     };
   }
 

@@ -55,6 +55,7 @@ const navByRole: Record<string, NavItem[]> = {
   PARENT: [
     { href: "/parent", label: "Головна" },
     { href: "/parent/schedule", label: "Розклад" },
+    { href: "/parent/reschedules", label: "Перенесення" },
     { href: "/parent/learning", label: "Навчання" },
     { href: "/parent/payments", label: "Оплати" },
     { href: "/parent/courses", label: "Курси" },
