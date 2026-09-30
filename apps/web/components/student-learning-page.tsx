@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { dateTime, lessonCount, phoneNumber } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
+import { HomeworkJournalCell } from "./homework-journal-cell";
 
 type StudentDashboardData = {
   student: {
@@ -59,6 +60,7 @@ type JournalEntry = {
   topicTitle?: string | null;
   homeworkAssigned?: boolean | null;
   homeworkDescription?: string | null;
+  homeworkCompletedAt?: string | null;
   actualTeacherFullName?: string | null;
   isSubstitute?: boolean;
 };
@@ -94,6 +96,8 @@ export function StudentLearningPage() {
   const [activeSubjectId, setActiveSubjectId] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [homeworkBusyId, setHomeworkBusyId] = useState<string | null>(null);
+  const [homeworkError, setHomeworkError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -124,6 +128,28 @@ export function StudentLearningPage() {
     const rows = dashboard?.enrollments ?? [];
     return activeSubjectId === "ALL" ? rows : rows.filter(row => row.subject.id === activeSubjectId);
   }, [dashboard, activeSubjectId]);
+
+  async function toggleHomework(enrollmentId: string, entry: JournalEntry) {
+    if (homeworkBusyId) return;
+    setHomeworkBusyId(entry.id);
+    setHomeworkError("");
+    try {
+      const result = await api<{ homeworkCompletedAt: string | null }>(`/sessions/${entry.id}/homework`, {
+        method: "PUT",
+        body: JSON.stringify({ completed: !entry.homeworkCompletedAt }),
+      });
+      setJournals((current) => ({
+        ...current,
+        [enrollmentId]: (current[enrollmentId] ?? []).map((row) =>
+          row.id === entry.id ? { ...row, homeworkCompletedAt: result.homeworkCompletedAt } : row,
+        ),
+      }));
+    } catch (cause) {
+      setHomeworkError(cause instanceof Error ? cause.message : "Не вдалося оновити домашнє завдання");
+    } finally {
+      setHomeworkBusyId(null);
+    }
+  }
 
   function nextLessonFor(subjectId: string) {
     return (dashboard?.nextLessons ?? []).find(lesson => (lesson.subjectId ?? lesson.subject_id) === subjectId) ?? null;
@@ -234,6 +260,7 @@ export function StudentLearningPage() {
               </div>
               {journal.length > 5 && <button className="btn secondary" onClick={() => setExpandedJournal(state => ({ ...state, [enrollment.id]: !state[enrollment.id] }))}>{showAll ? "Згорнути" : `Усі заняття · ${journal.length}`}</button>}
             </div>
+            {homeworkError && <div className="error" role="alert">{homeworkError}</div>}
             {visibleJournal.length ? <div className="table-wrap">
               <table className="journal-table student-journal-table">
                 <thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead>
@@ -241,7 +268,7 @@ export function StudentLearningPage() {
                   <td>{entry.lessonNumber}</td>
                   <td>{dateTime(entry.startsAt)}</td>
                   <td>{entry.topicTitle || "—"}</td>
-                  <td>{entry.homeworkAssigned ? <>Задано{entry.homeworkDescription && <span className="journal-homework-description">{entry.homeworkDescription}</span>}</> : "Не задано"}</td>
+                  <td><HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} busy={Boolean(homeworkBusyId)} onToggle={entry.homeworkAssigned ? () => void toggleHomework(enrollment.id, entry) : undefined} /></td>
                   <td>{entry.isSubstitute ? <span className="substitute-label">Провів: {entry.actualTeacherFullName}</span> : <span className="muted">—</span>}</td>
                 </tr>)}</tbody>
               </table>

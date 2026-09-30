@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { dateTime, phoneNumber } from "../lib/format";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { PlatformShell } from "./platform-shell";
+import { HomeworkJournalCell } from "./homework-journal-cell";
 
 const dayLabels: Record<number, string> = { 1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Нд" };
 
@@ -178,7 +179,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
                 <td>{entry.lessonNumber}</td>
                 <td>{dateTime(entry.startsAt)}</td>
                 <td>{entry.topicTitle || "—"}</td>
-                <td>{entry.homeworkAssigned ? <>Задано{entry.homeworkDescription && <span className="journal-homework-description">{entry.homeworkDescription}</span>}</> : "Не задано"}</td>
+                <td><HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} /></td>
                 <td>{entry.isSubstitute ? <span className="substitute-label">Провів: {teacherName(entry)}</span> : <span className="muted">—</span>}</td>
               </tr>)}</tbody>
             </table></div> : <div className="empty compact-empty">Проведених занять ще немає</div>}

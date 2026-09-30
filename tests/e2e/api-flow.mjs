@@ -572,6 +572,79 @@ async function run() {
   assert.equal(studentAsParent.payload?.error?.code, "PARENT_PORTAL_ONLY");
   expectStatus(await request("/ops/dashboard", { cookie: student.cookie }), 403, "student operations denied");
 
+  // A paid regular lesson exercises the full homework lifecycle across roles.
+  const rate = await request(`/teachers/${firstLessonTeacher.userId}/subjects/${firstLessonSubject.id}/rates`, {
+    method: "POST", cookie: admin.cookie, body: { rate60Minor: 20000, effectiveFrom: "2026-01-01" },
+  });
+  expectStatus(rate, 201, "configure teacher rate for regular lesson");
+
+  const topup = await request(`/enrollments/${enrollment.id}/topups/manual`, {
+    method: "POST", cookie: admin.cookie,
+    body: { lessonUnits: 2, amountMinor: 80000, paymentMethod: "BANK_TRANSFER", note: "E2E homework lifecycle" },
+  });
+  expectStatus(topup, 201, "fund regular lesson for homework lifecycle");
+
+  const scheduleDate = new Date(Date.now() + 4 * 86_400_000).toISOString().slice(0, 10);
+  const scheduleDayOfWeek = new Date(`${scheduleDate}T12:00:00Z`).getUTCDay() || 7;
+  const schedule = await request(`/enrollments/${enrollment.id}/schedule`, {
+    method: "PUT", cookie: admin.cookie,
+    body: { effectiveFrom: scheduleDate, slots: [{ dayOfWeek: scheduleDayOfWeek, startTime: "06:00", durationMinutes: 60 }] },
+  });
+  expectStatus(schedule, 200, "create funded regular schedule");
+
+  const scheduleEndDate = new Date(Date.parse(`${scheduleDate}T00:00:00Z`) + 7 * 86_400_000).toISOString().slice(0, 10);
+  const calendar = await request(`/calendar?from=${scheduleDate}&to=${scheduleEndDate}`, { cookie: parent.cookie });
+  expectStatus(calendar, 200, "find regular homework lesson");
+  const regularLesson = calendar.payload.find((item) =>
+    item.sessionType === "REGULAR" && item.student?.id === firstLessonStudent.id && item.fundingStatus === "PAID",
+  );
+  assert.ok(regularLesson?.id, "funded regular lesson must be materialized");
+
+  const pastRegularAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  pastRegularAt.setUTCHours(12, 0, 0, 0);
+  const moveRegular = await request(`/sessions/${regularLesson.id}/reschedule`, {
+    method: "POST", cookie: admin.cookie,
+    body: { startsAt: pastRegularAt.toISOString(), reason: "SCHOOL_REASON", mode: "MANUAL", comment: "E2E homework completion" },
+  });
+  expectStatus(moveRegular, 201, "move regular lesson to markable time");
+
+  const markedRegular = await request(`/sessions/${regularLesson.id}/mark`, {
+    method: "POST", cookie: admin.cookie,
+    body: { topicTitle: "E2E fractions", homeworkAssigned: true, homeworkDescription: "Exercises 1–4" },
+  });
+  expectStatus(markedRegular, 201, "mark regular lesson with homework");
+  expectStatus(await request(`/sessions/${regularLesson.id}/homework`, {
+    method: "PUT", cookie: parent.cookie, body: { completed: true },
+  }), 403, "parent cannot mark student homework");
+
+  const completedHomework = await request(`/sessions/${regularLesson.id}/homework`, {
+    method: "PUT", cookie: student.cookie, body: { completed: true },
+  });
+  expectStatus(completedHomework, 200, "student marks homework completed");
+  assert.ok(completedHomework.payload?.homeworkCompletedAt);
+  const repeatedCompletion = await request(`/sessions/${regularLesson.id}/homework`, {
+    method: "PUT", cookie: student.cookie, body: { completed: true },
+  });
+  expectStatus(repeatedCompletion, 200, "repeated completion is idempotent");
+  assert.equal(repeatedCompletion.payload.homeworkCompletedAt, completedHomework.payload.homeworkCompletedAt);
+
+  for (const [role, cookie] of [["parent", parent.cookie], ["teacher", teacher.cookie]]) {
+    const journal = await request(`/enrollments/${enrollment.id}/journal`, { cookie });
+    expectStatus(journal, 200, `${role} journal sees homework completion`);
+    const row = journal.payload.find((item) => item.id === regularLesson.id);
+    assert.equal(row?.homeworkDescription, "Exercises 1–4");
+    assert.ok(row?.homeworkCompletedAt);
+  }
+
+  const reopenedHomework = await request(`/sessions/${regularLesson.id}/homework`, {
+    method: "PUT", cookie: student.cookie, body: { completed: false },
+  });
+  expectStatus(reopenedHomework, 200, "student reopens homework");
+  assert.equal(reopenedHomework.payload?.homeworkCompletedAt, null);
+  const studentJournal = await request(`/enrollments/${enrollment.id}/journal`, { cookie: student.cookie });
+  expectStatus(studentJournal, 200, "student journal reflects reopened homework");
+  assert.equal(studentJournal.payload.find((item) => item.id === regularLesson.id)?.homeworkCompletedAt, null);
+
   const logout = await request("/auth/logout", { method: "POST", cookie: manager.cookie });
   expectStatus(logout, 201, "manager logout");
   expectStatus(await request("/auth/me", { cookie: manager.cookie }), 401, "revoked manager session");

@@ -602,6 +602,7 @@ export class LessonPoliciesService {
             topic_title=NULL,
             homework_assigned=NULL,
             homework_description=NULL,
+            homework_completed_at=NULL,
             marked_at=NULL,
             marked_by=NULL,
             updated_at=now()

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Put } from "@nestjs/common";
 import { RequestId } from "../../common/request-id.decorator";
 import { CurrentUser } from "../auth/current-user.decorator";
 import type { AuthUser } from "../auth/types";
@@ -6,6 +6,7 @@ import { RequirePermissions } from "../iam/require-permissions.decorator";
 import { CompleteFirstLessonDto } from "./dto/complete-first-lesson.dto";
 import { MarkRegularLessonDto } from "./dto/mark-regular-lesson.dto";
 import { ReportLessonIncidentDto } from "./dto/report-lesson-incident.dto";
+import { SetHomeworkCompletionDto } from "./dto/set-homework-completion.dto";
 import { UndoLessonOutcomeDto } from "./dto/undo-lesson-outcome.dto";
 import { LessonPoliciesService } from "./lesson-policies.service";
 import { LessonsService } from "./lessons.service";
@@ -70,6 +71,17 @@ export class LessonsController {
     @RequestId() requestId?: string,
   ) {
     return this.policies.undoLessonOutcome(sessionId, dto, user, requestId);
+  }
+
+  @RequirePermissions("lesson.view")
+  @Put("sessions/:sessionId/homework")
+  setHomeworkCompletion(
+    @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Body() dto: SetHomeworkCompletionDto,
+    @CurrentUser() user: AuthUser,
+    @RequestId() requestId?: string,
+  ) {
+    return this.lessons.setHomeworkCompletion(sessionId, dto, user, requestId);
   }
 
   @RequirePermissions("lesson.view")

@@ -16,6 +16,7 @@ import { formatInSchoolTimeZone } from "../../common/time/kyiv-time";
 import type { AuthUser } from "../auth/types";
 import { AuditService } from "../audit/audit.service";
 import type { MarkRegularLessonDto } from "./dto/mark-regular-lesson.dto";
+import type { SetHomeworkCompletionDto } from "./dto/set-homework-completion.dto";
 
 const PRIVILEGED_MARK_ROLES = new Set(["ADMIN", "MANAGER", "SUPPORT_MANAGER"]);
 const PRIVILEGED_VIEW_ROLES = new Set(["ADMIN", "MANAGER", "SUPPORT_MANAGER"]);
@@ -273,6 +274,7 @@ export class LessonsService {
           topicTitle,
           homeworkAssigned: dto.homeworkAssigned,
           homeworkDescription: dto.homeworkAssigned ? dto.homeworkDescription?.trim() || null : null,
+          homeworkCompletedAt: null,
           markedAt: now,
           markedBy: actor.id,
           updatedAt: now,
@@ -359,6 +361,65 @@ export class LessonsService {
     });
   }
 
+  async setHomeworkCompletion(
+    sessionId: string,
+    dto: SetHomeworkCompletionDto,
+    actor: AuthUser,
+    requestId?: string,
+  ) {
+    if (!actor.roles.includes("STUDENT")) {
+      throw new ForbiddenException({ code: "HOMEWORK_STUDENT_ONLY", message: "Only the student can update homework completion" });
+    }
+
+    return this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        SELECT ls.id, ls.session_type, ls.status, ls.homework_assigned,
+               ls.homework_completed_at, st.user_id AS student_user_id, st.archived_at
+        FROM live_sessions ls
+        JOIN students st ON st.id = ls.student_id
+        WHERE ls.id = ${sessionId}
+        FOR UPDATE OF ls
+      `);
+      if (!result.rowCount) throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
+      const lesson = result.rows[0] as {
+        session_type: string;
+        status: string;
+        homework_assigned: boolean | null;
+        homework_completed_at: Date | null;
+        student_user_id: string | null;
+        archived_at: Date | null;
+      };
+      if (lesson.student_user_id !== actor.id) {
+        throw new ForbiddenException({ code: "HOMEWORK_SCOPE_DENIED", message: "You cannot update this homework" });
+      }
+      if (lesson.archived_at || lesson.session_type !== "REGULAR" || lesson.status !== "COMPLETED" || lesson.homework_assigned !== true) {
+        throw new ConflictException({ code: "HOMEWORK_NOT_AVAILABLE", message: "This lesson has no active homework to complete" });
+      }
+      if (Boolean(lesson.homework_completed_at) === dto.completed) {
+        return { sessionId, homeworkCompletedAt: lesson.homework_completed_at };
+      }
+
+      const [updated] = await tx
+        .update(liveSessions)
+        .set({ homeworkCompletedAt: dto.completed ? new Date() : null, updatedAt: new Date() })
+        .where(eq(liveSessions.id, sessionId))
+        .returning({ homeworkCompletedAt: liveSessions.homeworkCompletedAt });
+
+      await this.audit.record({
+        actorUserId: actor.id,
+        actorRoleCode: "STUDENT",
+        action: dto.completed ? "HOMEWORK_MARK_COMPLETED" : "HOMEWORK_REOPENED",
+        entityType: "LiveSession",
+        entityId: sessionId,
+        requestId,
+        beforeData: { homeworkCompletedAt: lesson.homework_completed_at },
+        afterData: { homeworkCompletedAt: updated.homeworkCompletedAt },
+      }, tx);
+
+      return { sessionId, homeworkCompletedAt: updated.homeworkCompletedAt };
+    });
+  }
+
   async getEnrollmentJournal(enrollmentId: string, actor: AuthUser) {
     const scope = await this.resolveJournalScope(enrollmentId, actor);
 
@@ -370,6 +431,7 @@ export class LessonsService {
         s.topic_title,
         s.homework_assigned,
         s.homework_description,
+        s.homework_completed_at,
         s.primary_teacher_id,
         s.actual_teacher_id,
         t.first_name AS actual_teacher_first_name,
@@ -390,6 +452,7 @@ export class LessonsService {
       topicTitle: row.topic_title,
       homeworkAssigned: row.homework_assigned,
       homeworkDescription: row.homework_description,
+      homeworkCompletedAt: row.homework_completed_at,
       actualTeacher: {
         id: row.actual_teacher_id,
         firstName: row.actual_teacher_first_name,

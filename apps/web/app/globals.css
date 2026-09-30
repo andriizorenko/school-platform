@@ -264,6 +264,8 @@ tr:last-child td { border-bottom: 0; }
 .teacher-journal-section { display:grid; gap:12px; scroll-margin-top:90px; }
 .journal-table td { white-space:normal; vertical-align:top; }
 .journal-homework-description { display:block; margin-top:6px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.journal-homework-status { display:block; margin-top:6px; font-size:12px; }
+.journal-homework .link-button { margin-top:8px; text-align:left; }
 .journal-table td:nth-child(1) { width:58px; }
 .journal-table td:nth-child(2) { min-width:150px; }
 .journal-table td:nth-child(3) { min-width:260px; }

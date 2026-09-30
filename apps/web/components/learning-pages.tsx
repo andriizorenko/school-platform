@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { PlatformShell } from "./platform-shell";
+import { HomeworkJournalCell } from "./homework-journal-cell";
 import { dateTime, lessonCount, money, subjectCount } from "../lib/format";
 
 export function ParentLearningPage(){
@@ -85,7 +86,7 @@ export function ParentLearningPage(){
 
             <div className="parent-journal-section">
               <div className="section-heading row"><div><h3>Журнал</h3><p className="muted">Проведені заняття, теми та домашні завдання.</p></div>{journal.length>5&&<button className="btn secondary" onClick={()=>setExpanded(state=>({...state,[enrollment.id]:!state[enrollment.id]}))}>{expanded[enrollment.id]?"Згорнути":`Усі заняття · ${journal.length}`}</button>}</div>
-              {visibleJournal.length?<div className="table-wrap"><table className="journal-table"><thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead><tbody>{visibleJournal.map((entry:any)=><tr key={entry.id}><td>{entry.lessonNumber}</td><td>{dateTime(entry.startsAt)}</td><td>{entry.topicTitle||"—"}</td><td>{entry.homeworkAssigned ? <>Задано{entry.homeworkDescription && <span className="journal-homework-description">{entry.homeworkDescription}</span>}</> : "Не задано"}</td><td>{entry.isSubstitute?<span className="substitute-label">Провів: {entry.actualTeacherFullName}</span>:<span className="muted">—</span>}</td></tr>)}</tbody></table></div>:<div className="empty compact-empty">Проведених занять ще немає.</div>}
+              {visibleJournal.length?<div className="table-wrap"><table className="journal-table"><thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead><tbody>{visibleJournal.map((entry:any)=><tr key={entry.id}><td>{entry.lessonNumber}</td><td>{dateTime(entry.startsAt)}</td><td>{entry.topicTitle||"—"}</td><td><HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} /></td><td>{entry.isSubstitute?<span className="substitute-label">Провів: {entry.actualTeacherFullName}</span>:<span className="muted">—</span>}</td></tr>)}</tbody></table></div>:<div className="empty compact-empty">Проведених занять ще немає.</div>}
             </div>
 
             <div className="parent-reports-section">
