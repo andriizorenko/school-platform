@@ -179,6 +179,7 @@ export const liveSessions = pgTable(
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     topicTitle: text("topic_title"),
     homeworkAssigned: boolean("homework_assigned"),
+    homeworkDescription: text("homework_description"),
     markedAt: timestamp("marked_at", { withTimezone: true }),
     markedBy: uuid("marked_by").references(() => users.id, { onDelete: "restrict" }),
     createdBy: uuid("created_by")

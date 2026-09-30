@@ -58,6 +58,7 @@ type JournalEntry = {
   startsAt: string;
   topicTitle?: string | null;
   homeworkAssigned?: boolean | null;
+  homeworkDescription?: string | null;
   actualTeacherFullName?: string | null;
   isSubstitute?: boolean;
 };
@@ -229,7 +230,7 @@ export function StudentLearningPage() {
             <div className="section-heading row">
               <div>
                 <h3>Журнал</h3>
-                <p className="muted">Теми проведених уроків і факт домашнього завдання.</p>
+                <p className="muted">Теми проведених уроків і домашні завдання.</p>
               </div>
               {journal.length > 5 && <button className="btn secondary" onClick={() => setExpandedJournal(state => ({ ...state, [enrollment.id]: !state[enrollment.id] }))}>{showAll ? "Згорнути" : `Усі заняття · ${journal.length}`}</button>}
             </div>
@@ -240,7 +241,7 @@ export function StudentLearningPage() {
                   <td>{entry.lessonNumber}</td>
                   <td>{dateTime(entry.startsAt)}</td>
                   <td>{entry.topicTitle || "—"}</td>
-                  <td>{entry.homeworkAssigned ? "Задано" : "Не задано"}</td>
+                  <td>{entry.homeworkAssigned ? <>Задано{entry.homeworkDescription && <span className="journal-homework-description">{entry.homeworkDescription}</span>}</> : "Не задано"}</td>
                   <td>{entry.isSubstitute ? <span className="substitute-label">Провів: {entry.actualTeacherFullName}</span> : <span className="muted">—</span>}</td>
                 </tr>)}</tbody>
               </table>

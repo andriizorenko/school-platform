@@ -178,7 +178,7 @@ export function TeacherStudentDetail({ studentId }: { studentId: string }) {
                 <td>{entry.lessonNumber}</td>
                 <td>{dateTime(entry.startsAt)}</td>
                 <td>{entry.topicTitle || "—"}</td>
-                <td>{entry.homeworkAssigned ? "Задано" : "Не задано"}</td>
+                <td>{entry.homeworkAssigned ? <>Задано{entry.homeworkDescription && <span className="journal-homework-description">{entry.homeworkDescription}</span>}</> : "Не задано"}</td>
                 <td>{entry.isSubstitute ? <span className="substitute-label">Провів: {teacherName(entry)}</span> : <span className="muted">—</span>}</td>
               </tr>)}</tbody>
             </table></div> : <div className="empty compact-empty">Проведених занять ще немає</div>}

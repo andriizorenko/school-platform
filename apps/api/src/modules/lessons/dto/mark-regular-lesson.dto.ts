@@ -1,4 +1,4 @@
-import { IsBoolean, IsString, MaxLength, MinLength } from "class-validator";
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 export class MarkRegularLessonDto {
   @IsString()
@@ -8,4 +8,9 @@ export class MarkRegularLessonDto {
 
   @IsBoolean()
   homeworkAssigned!: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  homeworkDescription?: string;
 }

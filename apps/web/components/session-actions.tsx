@@ -84,6 +84,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
 
   const [topicTitle, setTopicTitle] = useState("");
   const [homeworkAssigned, setHomeworkAssigned] = useState<boolean | null>(null);
+  const [homeworkDescription, setHomeworkDescription] = useState("");
   const [strengths, setStrengths] = useState("");
   const [gaps, setGaps] = useState("");
   const [actionPlan, setActionPlan] = useState("");
@@ -279,6 +280,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         body: JSON.stringify({
           topicTitle: topicTitle.trim(),
           homeworkAssigned,
+          homeworkDescription: homeworkAssigned ? homeworkDescription.trim() : undefined,
         }),
       });
 
@@ -530,6 +532,12 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
               <label className={`choice-card ${homeworkAssigned === true ? "selected" : ""}`}><input type="radio" name="homework" checked={homeworkAssigned === true} onChange={() => setHomeworkAssigned(true)} />Задано</label>
               <label className={`choice-card ${homeworkAssigned === false ? "selected" : ""}`}><input type="radio" name="homework" checked={homeworkAssigned === false} onChange={() => setHomeworkAssigned(false)} />Не задано</label>
             </fieldset>
+            {homeworkAssigned === true && (
+              <div className="field">
+                <label htmlFor="lesson-homework-description">Що саме задано (необовʼязково)</label>
+                <textarea id="lesson-homework-description" className="textarea" rows={4} maxLength={2000} disabled={busy} value={homeworkDescription} onChange={(event) => setHomeworkDescription(event.target.value)} placeholder="Наприклад: підручник, с. 42, № 5–8" />
+              </div>
+            )}
           </>
         )}
 
