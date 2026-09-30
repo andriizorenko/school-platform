@@ -143,14 +143,56 @@ test.describe.serial("role beta smoke", () => {
     await expect(page.locator(".error")).toHaveCount(0);
   });
 
-  test("Student sees own enrollment and journal navigation", async ({ page }) => {
+  test("Student sees homework across journals, retries a failed load, and updates its state", async ({ page }) => {
     const account = accounts.student;
     await login(page, account);
     await expectHome(page, account);
     await expect(page.getByRole("heading", { name: "E2E Mathematics" }).first()).toBeVisible();
-    await page.getByRole("link", { name: "Журнал" }).first().click();
+    await expect(page.getByRole("link", { name: "Домашні завдання" })).toHaveAttribute("href", "/student/journal");
+
+    let journalAttempts = 0;
+    await page.route("**/api/enrollments/*/journal", async (route) => {
+      journalAttempts += 1;
+      if (journalAttempts === 1) {
+        await route.fulfill({ status: 503, json: { message: "Temporary error" } });
+        return;
+      }
+      await route.fulfill({ status: 200, json: [{
+        id: "e2e-homework-ui",
+        lessonNumber: 1,
+        startsAt: "2026-09-01T12:00:00.000Z",
+        topicTitle: "Fractions",
+        homeworkAssigned: true,
+        homeworkDescription: "Exercises 1–4",
+        homeworkCompletedAt: null,
+      }] });
+    });
+    await page.route("**/api/sessions/e2e-homework-ui/homework", async (route) => {
+      const completed = route.request().postDataJSON().completed;
+      await route.fulfill({ status: 200, json: {
+        sessionId: "e2e-homework-ui",
+        homeworkCompletedAt: completed ? "2026-09-02T12:00:00.000Z" : null,
+      } });
+    });
+
+    await page.getByRole("link", { name: "Домашні завдання" }).click();
     await expect(page).toHaveURL(/\/student\/journal$/);
-    await expect(page.getByText("E2E Mathematics", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Домашні завдання" })).toBeVisible();
+    await expect(page.getByText(/Не вдалося завантажити 1 журнал/)).toBeVisible();
+    await page.getByRole("button", { name: "Спробувати знову" }).click();
+    const open = page.getByRole("button", { name: /Потрібно виконати ·/ });
+    const done = page.getByRole("button", { name: /Виконано ·/ });
+    const task = page.locator(".student-homework-item").filter({ hasText: "Exercises 1–4" });
+    await expect(open).toContainText("· 1");
+    await expect(task).toBeVisible();
+    await task.getByRole("button", { name: "Позначити виконаним" }).click();
+    await expect(open).toContainText("· 0");
+    await done.click();
+    await expect(task).toBeVisible();
+    await task.getByRole("button", { name: "Повернути в роботу" }).click();
+    await expect(done).toContainText("· 0");
+    await open.click();
+    await expect(task).toBeVisible();
     await expect(page.locator(".error")).toHaveCount(0);
   });
 });

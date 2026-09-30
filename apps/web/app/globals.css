@@ -313,6 +313,16 @@ tr:last-child td { border-bottom: 0; }
 .student-learning-summary > div { display:grid; gap:5px; }
 .student-learning-summary strong { font-size:20px; }
 .student-subject-filter { width:fit-content; max-width:100%; overflow-x:auto; }
+.student-homework-section { display:grid; gap:16px; scroll-margin-top:24px; }
+.student-homework-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.student-homework-heading > * { min-width:0; }
+.student-homework-heading h2 { margin-bottom:6px; }
+.student-homework-heading .segmented { flex:0 0 auto; }
+.student-homework-list { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
+.student-homework-item { min-width:0; padding:14px; border:1px solid var(--border); border-radius:12px; background:#fcfcfd; display:grid; gap:8px; overflow-wrap:anywhere; }
+.student-homework-meta { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; }
+.student-homework-more { justify-self:start; }
+.student-homework-section .error .btn { margin-left:12px; }
 .student-subject-card { display:grid; gap:20px; }
 .student-subject-header { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; }
 .student-subject-header h2 { margin-bottom:0; }
@@ -468,6 +478,9 @@ tr:last-child td { border-bottom: 0; }
   .student-learning-head { align-items:stretch; }
   .student-learning-nav { justify-content:flex-start; overflow-x:auto; flex-wrap:nowrap; padding-bottom:2px; }
   .student-learning-nav .btn { flex:0 0 auto; }
+  .student-homework-heading { flex-direction:column; }
+  .student-homework-heading .segmented { flex:0 1 auto; max-width:100%; overflow-x:auto; }
+  .student-homework-heading .segmented button { white-space:nowrap; }
   .student-learning-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .student-subject-header,.student-next-lesson-hero { align-items:stretch; flex-direction:column; }
   .student-balance-box { min-width:0; text-align:left; }

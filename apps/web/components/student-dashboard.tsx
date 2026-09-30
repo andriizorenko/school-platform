@@ -21,6 +21,7 @@ export function StudentDashboard() {
       <div className="row">
         <Link className="btn" href="/student/schedule">Розклад</Link>
         <Link className="btn secondary" href="/student/journal">Журнал</Link>
+        <Link className="btn secondary" href="/student/journal">Домашні завдання</Link>
         <Link className="btn secondary" href="/student/courses">Курси</Link>
       </div>
     </div>

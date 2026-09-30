@@ -65,6 +65,8 @@ type JournalEntry = {
   isSubstitute?: boolean;
 };
 
+type HomeworkEntry = JournalEntry & { enrollmentId: string; subjectName: string };
+
 type ProgressReport = {
   id: string;
   subjectId: string;
@@ -91,6 +93,10 @@ function reportTypeLabel(type: string) {
 export function StudentLearningPage() {
   const [dashboard, setDashboard] = useState<StudentDashboardData | null>(null);
   const [journals, setJournals] = useState<Record<string, JournalEntry[]>>({});
+  const [journalErrors, setJournalErrors] = useState<string[]>([]);
+  const [retryingJournals, setRetryingJournals] = useState(false);
+  const [homeworkFilter, setHomeworkFilter] = useState<"OPEN" | "DONE">("OPEN");
+  const [expandedHomework, setExpandedHomework] = useState(false);
   const [reports, setReports] = useState<ProgressReport[]>([]);
   const [expandedJournal, setExpandedJournal] = useState<Record<string, boolean>>({});
   const [activeSubjectId, setActiveSubjectId] = useState<string>("ALL");
@@ -104,16 +110,18 @@ export function StudentLearningPage() {
     (async () => {
       try {
         const data = await api<StudentDashboardData>("/student/dashboard");
-        const journalEntries = await Promise.all(
-          data.enrollments.map(async enrollment => [
-            enrollment.id,
-            await api<JournalEntry[]>(`/enrollments/${enrollment.id}/journal`).catch(() => []),
-          ] as const),
-        );
+        const journalEntries = await Promise.all(data.enrollments.map(async (enrollment) => {
+          try {
+            return { id: enrollment.id, rows: await api<JournalEntry[]>(`/enrollments/${enrollment.id}/journal`), failed: false };
+          } catch {
+            return { id: enrollment.id, rows: [] as JournalEntry[], failed: true };
+          }
+        }));
         const reportRows = await api<ProgressReport[]>(`/students/${data.student.id}/reports`).catch(() => []);
         if (!active) return;
         setDashboard(data);
-        setJournals(Object.fromEntries(journalEntries));
+        setJournals(Object.fromEntries(journalEntries.map(({ id, rows }) => [id, rows])));
+        setJournalErrors(journalEntries.filter(({ failed }) => failed).map(({ id }) => id));
         setReports(reportRows);
       } catch (cause: any) {
         if (active) setError(cause.message ?? "Не вдалося завантажити навчання");
@@ -123,6 +131,36 @@ export function StudentLearningPage() {
     })();
     return () => { active = false; };
   }, []);
+
+  const homeworkEntries = useMemo<HomeworkEntry[]>(() => (dashboard?.enrollments ?? [])
+    .flatMap((enrollment) => (journals[enrollment.id] ?? [])
+      .filter((entry) => entry.homeworkAssigned)
+      .map((entry) => ({ ...entry, enrollmentId: enrollment.id, subjectName: enrollment.subject.name })))
+    .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()), [dashboard, journals]);
+  const openHomeworkCount = homeworkEntries.filter((entry) => !entry.homeworkCompletedAt).length;
+  const filteredHomework = homeworkEntries.filter((entry) => homeworkFilter === "OPEN" ? !entry.homeworkCompletedAt : Boolean(entry.homeworkCompletedAt));
+  const visibleHomework = expandedHomework ? filteredHomework : filteredHomework.slice(0, 6);
+
+  async function retryFailedJournals() {
+    if (retryingJournals || !journalErrors.length) return;
+    setRetryingJournals(true);
+    try {
+      const results = await Promise.all(journalErrors.map(async (id) => {
+        try {
+          return { id, rows: await api<JournalEntry[]>(`/enrollments/${id}/journal`), failed: false };
+        } catch {
+          return { id, rows: [] as JournalEntry[], failed: true };
+        }
+      }));
+      setJournals((current) => ({
+        ...current,
+        ...Object.fromEntries(results.filter(({ failed }) => !failed).map(({ id, rows }) => [id, rows])),
+      }));
+      setJournalErrors(results.filter(({ failed }) => failed).map(({ id }) => id));
+    } finally {
+      setRetryingJournals(false);
+    }
+  }
 
   const visibleEnrollments = useMemo(() => {
     const rows = dashboard?.enrollments ?? [];
@@ -194,6 +232,33 @@ export function StudentLearningPage() {
         </div>
       </div>
 
+      <section className="card student-homework-section" id="homework" aria-labelledby="student-homework-title">
+        <div className="student-homework-heading">
+          <div>
+            <h2 id="student-homework-title">Домашні завдання</h2>
+            <p className="muted">Завдання з проведених уроків усіх предметів. Стан виконання позначає учень.</p>
+          </div>
+          {journalErrors.length === 0 && <div className="segmented" role="group" aria-label="Фільтр домашніх завдань">
+            <button type="button" aria-pressed={homeworkFilter === "OPEN"} className={homeworkFilter === "OPEN" ? "active" : ""} onClick={() => { setHomeworkFilter("OPEN"); setExpandedHomework(false); }}>Потрібно виконати · {openHomeworkCount}</button>
+            <button type="button" aria-pressed={homeworkFilter === "DONE"} className={homeworkFilter === "DONE" ? "active" : ""} onClick={() => { setHomeworkFilter("DONE"); setExpandedHomework(false); }}>Виконано · {homeworkEntries.length - openHomeworkCount}</button>
+          </div>}
+        </div>
+        {journalErrors.length > 0 ? <div className="error" role="alert">
+          Не вдалося завантажити {journalErrors.length} {journalErrors.length === 1 ? "журнал" : "журналів"}. Список завдань може бути неповним.
+          <button className="btn secondary" type="button" onClick={() => void retryFailedJournals()} disabled={retryingJournals}>{retryingJournals ? "Повторюємо…" : "Спробувати знову"}</button>
+        </div> : <>
+          {homeworkError && <div className="error" role="alert">{homeworkError}</div>}
+          {visibleHomework.length > 0 ? <ul className="student-homework-list">
+            {visibleHomework.map((entry) => <li key={entry.id} className="student-homework-item">
+              <div className="student-homework-meta"><strong>{entry.subjectName}</strong><span className="muted">{dateTime(entry.startsAt)}</span></div>
+              <div><strong>Тема:</strong> {entry.topicTitle || "Не вказана"}</div>
+              <HomeworkJournalCell assigned={entry.homeworkAssigned} description={entry.homeworkDescription} completedAt={entry.homeworkCompletedAt} busy={Boolean(homeworkBusyId)} onToggle={() => void toggleHomework(entry.enrollmentId, entry)} />
+            </li>)}
+          </ul> : <div className="empty compact-empty">{homeworkFilter === "OPEN" ? "Завдань, які потрібно виконати, немає." : "Виконаних завдань поки немає."}</div>}
+          {filteredHomework.length > 6 && <button className="btn secondary student-homework-more" type="button" onClick={() => setExpandedHomework((current) => !current)}>{expandedHomework ? "Згорнути" : `Показати всі · ${filteredHomework.length}`}</button>}
+        </>}
+      </section>
+
       {dashboard.enrollments.length > 1 && <div className="student-subject-filter segmented" aria-label="Фільтр предметів">
         <button className={activeSubjectId === "ALL" ? "active" : ""} onClick={() => setActiveSubjectId("ALL")}>Усі</button>
         {dashboard.enrollments.map(enrollment => <button key={enrollment.id} className={activeSubjectId === enrollment.subject.id ? "active" : ""} onClick={() => setActiveSubjectId(enrollment.subject.id)}>{enrollment.subject.name}</button>)}
@@ -260,8 +325,9 @@ export function StudentLearningPage() {
               </div>
               {journal.length > 5 && <button className="btn secondary" onClick={() => setExpandedJournal(state => ({ ...state, [enrollment.id]: !state[enrollment.id] }))}>{showAll ? "Згорнути" : `Усі заняття · ${journal.length}`}</button>}
             </div>
+            {journalErrors.includes(enrollment.id) ? <div className="error" role="alert">Журнал тимчасово недоступний. Повторіть завантаження в розділі «Домашні завдання».</div> : null}
             {homeworkError && <div className="error" role="alert">{homeworkError}</div>}
-            {visibleJournal.length ? <div className="table-wrap">
+            {!journalErrors.includes(enrollment.id) && visibleJournal.length ? <div className="table-wrap">
               <table className="journal-table student-journal-table">
                 <thead><tr><th>№</th><th>Дата</th><th>Тема</th><th>ДЗ</th><th>Заміна</th></tr></thead>
                 <tbody>{visibleJournal.map(entry => <tr key={entry.id}>
@@ -272,7 +338,7 @@ export function StudentLearningPage() {
                   <td>{entry.isSubstitute ? <span className="substitute-label">Провів: {entry.actualTeacherFullName}</span> : <span className="muted">—</span>}</td>
                 </tr>)}</tbody>
               </table>
-            </div> : <div className="empty compact-empty">Проведених занять ще немає.</div>}
+            </div> : !journalErrors.includes(enrollment.id) ? <div className="empty compact-empty">Проведених занять ще немає.</div> : null}
           </div>
 
           <div className="student-reports-section">
