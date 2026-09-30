@@ -396,7 +396,7 @@ export class LessonsService {
         throw new ConflictException({ code: "HOMEWORK_NOT_AVAILABLE", message: "This lesson has no active homework to complete" });
       }
       if (Boolean(lesson.homework_completed_at) === dto.completed) {
-        return { sessionId, homeworkCompletedAt: lesson.homework_completed_at };
+        return { sessionId, homeworkCompletedAt: lesson.homework_completed_at ? new Date(lesson.homework_completed_at).toISOString() : null };
       }
 
       const [updated] = await tx
@@ -452,7 +452,7 @@ export class LessonsService {
       topicTitle: row.topic_title,
       homeworkAssigned: row.homework_assigned,
       homeworkDescription: row.homework_description,
-      homeworkCompletedAt: row.homework_completed_at,
+      homeworkCompletedAt: row.homework_completed_at ? new Date(row.homework_completed_at).toISOString() : null,
       actualTeacher: {
         id: row.actual_teacher_id,
         firstName: row.actual_teacher_first_name,
