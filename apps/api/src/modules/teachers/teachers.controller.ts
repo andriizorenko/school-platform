@@ -43,6 +43,11 @@ export class TeachersController {
     return this.teachers.getById(user.id);
   }
 
+  @Get("me/conversion")
+  myConversion(@CurrentUser() user: AuthUser) {
+    return this.teachers.myConversion(user);
+  }
+
   @Patch("me/profile")
   updateMyProfile(
     @Body() dto: UpdateMyTeacherProfileDto,

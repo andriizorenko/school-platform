@@ -166,6 +166,40 @@ export class TeachersService {
     return [...grouped.values()];
   }
 
+
+  async myConversion(actor: AuthUser) {
+    if (!actor.roles.includes("TEACHER")) {
+      throw new ForbiddenException({ code: "TEACHER_CONVERSION_SCOPE_DENIED", message: "Teacher account required" });
+    }
+    const result = await this.db.execute(sql`
+      WITH first_lessons AS (
+        SELECT ls.id, ls.student_id, ls.subject_id, ls.starts_at,
+          EXISTS (
+            SELECT 1
+            FROM student_subject_enrollments e
+            JOIN orders o ON o.family_id = (SELECT st.family_id FROM students st WHERE st.id=ls.student_id)
+            LEFT JOIN lesson_topups lt ON lt.order_id=o.id AND lt.enrollment_id=e.id
+            LEFT JOIN lesson_checkout_intents lci ON lci.order_id=o.id AND lci.enrollment_id=e.id
+            WHERE e.student_id=ls.student_id AND e.subject_id=ls.subject_id
+              AND (lt.id IS NOT NULL OR lci.id IS NOT NULL)
+              AND o.status IN ('PAID','PARTIALLY_REFUNDED')
+              AND o.paid_at >= ls.starts_at
+              AND o.total_minor > COALESCE((SELECT SUM(p.refunded_minor) FROM payments p WHERE p.order_id=o.id),0)
+          ) AS bought
+        FROM live_sessions ls
+        WHERE ls.actual_teacher_id=${actor.id}
+          AND ls.session_type='FIRST' AND ls.status='COMPLETED'
+      )
+      SELECT COUNT(*)::int AS first_lessons,
+        COUNT(*) FILTER (WHERE bought)::int AS purchased
+      FROM first_lessons
+    `);
+    const row = result.rows[0] as { first_lessons: number; purchased: number };
+    const firstLessons = Number(row.first_lessons);
+    const purchased = Number(row.purchased);
+    return { firstLessons, purchased, percentage: firstLessons ? Math.round(purchased * 100 / firstLessons) : null };
+  }
+
   async listMyStudents(
     actor: AuthUser,
     input: { search?: string; status?: "ACTIVE" | "ARCHIVED" | "ALL" },

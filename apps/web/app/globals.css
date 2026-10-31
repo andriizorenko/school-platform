@@ -2396,3 +2396,7 @@ th { background: rgba(247,249,255,.74); }
 .teacher-review-form .textarea { width:100%; }
 .teacher-review-preview p { margin:0; line-height:1.5; }
 .teacher-review-preview > a { color:var(--accent); font-weight:700; }
+
+.teacher-conversion { display:grid; gap:10px; background:linear-gradient(120deg,#f7f6ff,#f4fbfb); }
+.teacher-conversion h2 { margin:0 0 5px; }
+.teacher-conversion p { margin:0; }

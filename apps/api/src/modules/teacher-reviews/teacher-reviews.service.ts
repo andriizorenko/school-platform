@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Database } from "@school/db";
 import { sql } from "drizzle-orm";
 import { DATABASE } from "../../common/database/database.constants";
@@ -48,10 +48,14 @@ export class TeacherReviewsService {
       throw new ForbiddenException({ code: "TEACHER_REVIEW_LESSON_REQUIRED", message: "A completed lesson in your family is required" });
     }
     const teacherId = (session.rows[0] as { teacher_id: string }).teacher_id;
+    const comment = dto.comment.trim();
+    if (comment.length < 10) {
+      throw new BadRequestException({ code: "TEACHER_REVIEW_COMMENT_TOO_SHORT", message: "Review must have at least 10 characters" });
+    }
     try {
       const result = await this.db.execute(sql`INSERT INTO teacher_reviews
         (parent_id, teacher_id, session_id, rating, comment)
-        VALUES (${actor.id}, ${teacherId}, ${dto.sessionId}::uuid, ${dto.rating}, ${dto.comment.trim()})
+        VALUES (${actor.id}, ${teacherId}, ${dto.sessionId}::uuid, ${dto.rating}, ${comment})
         RETURNING id, status`);
       return result.rows[0];
     } catch (error) {

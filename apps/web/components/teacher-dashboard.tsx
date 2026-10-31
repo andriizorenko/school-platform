@@ -46,6 +46,7 @@ type CalendarEvent = {
 };
 type PayrollOverview = { currentPeriod: { period_start: string; period_end: string } | null };
 type Statement = { totalMinor: number };
+type Conversion = { firstLessons: number; purchased: number; percentage: number | null };
 
 function fullDate(value: string) {
   const [year, month, day] = value.slice(0, 10).split("-");
@@ -64,6 +65,7 @@ export function TeacherDashboard() {
   const [profile, setProfile] = useState<TeacherProfile | null>(null);
   const [sessions, setSessions] = useState<CalendarEvent[]>([]);
   const [payroll, setPayroll] = useState<PayrollOverview | null>(null);
+  const [conversion, setConversion] = useState<Conversion | null>(null);
   const [incomeView, setIncomeView] = useState<"PERIOD" | "MONTH">("PERIOD");
   const [statement, setStatement] = useState<Statement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,11 +80,13 @@ export function TeacherDashboard() {
       api<TeacherProfile>("/teachers/me/profile"),
       api<CalendarEvent[]>("/calendar?from=" + today + "&to=" + today),
       api<PayrollOverview>("/payroll/me"),
-    ]).then(([nextProfile, nextSessions, nextPayroll]) => {
+      api<Conversion>("/teachers/me/conversion"),
+    ]).then(([nextProfile, nextSessions, nextPayroll, nextConversion]) => {
       if (!active) return;
       setProfile(nextProfile);
       setSessions(nextSessions);
       setPayroll(nextPayroll);
+      setConversion(nextConversion);
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "Не вдалося завантажити головну сторінку");
     }).finally(() => { if (active) setLoading(false); });
@@ -167,6 +171,13 @@ export function TeacherDashboard() {
             <div className="muted">{periodLabel}</div>
             {incomeError && <div className="error" role="alert">{incomeError}</div>}
             <Link className="link-button" href="/teacher/payouts">Деталі виплат і виписка</Link>
+          </section>
+
+          <section className="card teacher-conversion" aria-labelledby="teacher-conversion-title">
+            <div><h2 id="teacher-conversion-title">Результативність перших уроків</h2>
+              <p className="muted">Частка проведених перших уроків, після яких сім’я придбала регулярні заняття.</p></div>
+            <strong className="teacher-income-amount">{conversion?.percentage === null || conversion?.percentage === undefined ? "—" : conversion.percentage + "%"}</strong>
+            <span className="muted">{conversion?.firstLessons ? conversion.purchased + " із " + conversion.firstLessons + " перших уроків" : "Проведених перших уроків поки немає"}</span>
           </section>
 
           <section className="card teacher-today" aria-labelledby="teacher-today-title">

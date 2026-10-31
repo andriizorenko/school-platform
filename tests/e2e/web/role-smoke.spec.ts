@@ -129,6 +129,7 @@ test.describe.serial("role beta smoke", () => {
     await expectHome(page, account);
     await expect(page.getByRole("heading", { name: "Головна викладача" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Мій календар сьогодні" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Результативність перших уроків" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Мій профіль" })).toBeVisible();
     const period = page.getByRole("button", { name: "Період виплати" });
     await expect(period).toHaveAttribute("aria-pressed", "true");
