@@ -633,13 +633,16 @@ export class TeachersService {
   async setSubjectStatus(teacherId: string, subjectId: string, active: boolean, actor: AuthUser, requestId?: string) {
     return this.db.transaction(async (tx) => {
       const before = await tx.execute(sql`
-        SELECT ts.id,ts.is_active,s.name
+        SELECT ts.id,ts.is_active,s.name,s.status AS subject_status
         FROM teacher_subjects ts JOIN subjects s ON s.id=ts.subject_id
         WHERE ts.teacher_id=${teacherId} AND ts.subject_id=${subjectId}
         FOR UPDATE OF ts
       `);
       if (!before.rowCount) throw new NotFoundException({ code: "TEACHER_SUBJECT_NOT_FOUND", message: "Teacher subject assignment not found" });
       const row = before.rows[0] as any;
+      if (active && row.subject_status !== "ACTIVE") {
+        throw new ConflictException({ code: "SUBJECT_ARCHIVED", message: "Restore the subject before activating it for a teacher" });
+      }
       if (!active) {
         const activeEnrollment = await tx.execute(sql`
           SELECT 1 FROM teacher_assignments ta
