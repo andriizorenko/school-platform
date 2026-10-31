@@ -29,6 +29,7 @@ import { AccountsModule } from "./modules/accounts/accounts.module";
 import { PromotionsModule } from "./modules/promotions/promotions.module";
 import { FilesModule } from "./modules/files/files.module";
 import { HistoryModule } from "./modules/history/history.module";
+import { TeacherReviewsModule } from "./modules/teacher-reviews/teacher-reviews.module";
 import { validateEnvironment } from "./common/config/validate-env";
 import { ObservabilityModule } from "./common/observability/observability.module";
 import { SecurityModule } from "./common/security/security.module";
@@ -61,6 +62,7 @@ import { SecurityModule } from "./common/security/security.module";
     PromotionsModule,
     FilesModule,
     HistoryModule,
+    TeacherReviewsModule,
   ],
   controllers: [HealthController],
   providers: [

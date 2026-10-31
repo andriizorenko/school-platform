@@ -2383,3 +2383,16 @@ th { background: rgba(247,249,255,.74); }
 .teacher-knowledge-preview p { margin:0; }
 .teacher-knowledge-preview a { font-weight:700; color:var(--accent); }
 @media(max-width:800px){.teacher-knowledge-intro,.teacher-knowledge-grid{grid-template-columns:1fr}}
+
+/* Family teacher reviews and moderation. */
+.teacher-reviews-grid { align-items:start; }
+.teacher-review-card { display:grid; gap:14px; min-width:0; overflow-wrap:anywhere; }
+.teacher-review-card h2 { margin:0 0 4px; }
+.teacher-review-card p { margin:0; line-height:1.55; white-space:pre-wrap; }
+.teacher-review-card .badge { flex-shrink:0; }
+.teacher-review-stars { color:#e89412; font-size:21px; letter-spacing:1px; white-space:nowrap; }
+.teacher-review-form { border-top:1px solid var(--border); padding-top:14px; }
+.teacher-review-form .field { display:grid; gap:6px; }
+.teacher-review-form .textarea { width:100%; }
+.teacher-review-preview p { margin:0; line-height:1.5; }
+.teacher-review-preview > a { color:var(--accent); font-weight:700; }

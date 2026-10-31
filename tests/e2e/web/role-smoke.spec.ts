@@ -89,6 +89,13 @@ test.describe.serial("role beta smoke", () => {
     await page.getByRole("button", { name: "Я зберіг коди" }).click();
     await expectHome(page, account);
     await expect(page.getByRole("heading", { name: "Стан школи" })).toBeVisible();
+    let approved = false;
+    await page.route("**/api/teacher-reviews/admin/pending", async (route) => route.fulfill({ status: 200, json: approved ? [] : [{ id: "11111111-1111-4111-8111-111111111111", rating: 5, comment: "Дуже корисні уроки і пояснення.", created_at: "2026-10-30T12:00:00.000Z", status: "PENDING", parent_first_name: "Parent", parent_last_name: "E2E", teacher_first_name: "Teacher", teacher_last_name: "E2E", student_first_name: "Student", student_last_name: "E2E", starts_at: "2026-10-29T12:00:00.000Z", subject_name: "E2E Mathematics" }] }));
+    await page.route("**/api/teacher-reviews/admin/11111111-1111-4111-8111-111111111111", async (route) => { approved = route.request().postDataJSON().status === "APPROVED"; await route.fulfill({ status: 200, json: { id: "11111111-1111-4111-8111-111111111111", status: "APPROVED" } }); });
+    await page.getByRole("link", { name: "Відгуки викладачів" }).click();
+    await expect(page.getByRole("heading", { name: "Модерація відгуків" })).toBeVisible();
+    await page.getByRole("button", { name: "Схвалити" }).click();
+    await expect(page.getByText("Немає відгуків на модерації.")).toBeVisible();
   });
 
   test("Manager reaches operational dashboard and cannot open admin settings", async ({ page }) => {
@@ -140,6 +147,10 @@ test.describe.serial("role beta smoke", () => {
     await expect(page).toHaveURL(/\/teacher\/students$/);
     await expect(page.getByText("Student E2E", { exact: false })).toBeVisible();
     await expect(page.getByText("E2E Mathematics", { exact: true })).toBeVisible();
+    await page.route("**/api/teacher-reviews/me", async (route) => route.fulfill({ status: 200, json: [{ id: "approved-review", rating: 5, comment: "Дуже корисні уроки і пояснення.", created_at: "2026-10-30T12:00:00.000Z", parent_first_name: "Parent", parent_last_name: "E2E", student_first_name: "Student", subject_name: "E2E Mathematics" }] }));
+    await page.getByRole("link", { name: "Відгуки", exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "Відгуки про мої уроки" })).toBeVisible();
+    await expect(page.getByText("Дуже корисні уроки і пояснення.")).toBeVisible();
     await expect(page.locator(".error")).toHaveCount(0);
   });
 
@@ -187,6 +198,15 @@ test.describe.serial("role beta smoke", () => {
     await expect(page).toHaveURL(/\/parent\/payments$/);
     await expect(page.getByText(/Онлайн-оплата:/)).toBeVisible();
     await expect(page.getByLabel("Спосіб оплати")).toBeVisible();
+    let submitted = false;
+    await page.route("**/api/teacher-reviews/parent/opportunities", async (route) => route.fulfill({ status: 200, json: [{ session_id: "22222222-2222-4222-8222-222222222222", teacher_first_name: "Teacher", teacher_last_name: "E2E", student_first_name: "Student", student_last_name: "E2E", subject_name: "E2E Mathematics", starts_at: "2026-10-29T12:00:00.000Z", review_id: submitted ? "review-e2e" : null, review_status: submitted ? "PENDING" : null }] }));
+    await page.route("**/api/teacher-reviews", async (route) => { submitted = route.request().postDataJSON().rating === 5; await route.fulfill({ status: 201, json: { id: "review-e2e", status: "PENDING" } }); });
+    await page.getByRole("link", { name: "Відгуки", exact: true }).first().click();
+    await expect(page.getByRole("heading", { name: "Відгуки про викладачів" })).toBeVisible();
+    await page.getByRole("button", { name: "Залишити відгук" }).click();
+    await page.getByPlaceholder("Що було корисним у заняттях?").fill("Дуже корисні уроки і пояснення.");
+    await page.getByRole("button", { name: "Надіслати на модерацію" }).click();
+    await expect(page.getByText("На модерації")).toBeVisible();
     await expect(page.locator(".error")).toHaveCount(0);
   });
 

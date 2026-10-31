@@ -6,6 +6,27 @@ import { api } from "../lib/api";
 import { dateOnly, kyivDateValue, money, timeOnly } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 
+type ApprovedReview = { id: string; rating: number; comment: string; parent_first_name: string; parent_last_name: string };
+
+function TeacherReviewsPreview() {
+  const [reviews, setReviews] = useState<ApprovedReview[]>([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    api<ApprovedReview[]>("/teacher-reviews/me").then((items) => { if (active) setReviews(items); })
+      .catch(() => { if (active) setError("Не вдалося завантажити відгуки."); });
+    return () => { active = false; };
+  }, []);
+  return <section className="card teacher-review-preview"><h2>Відгуки</h2>
+    {error ? <p className="muted">{error}</p> : reviews.length ? <>
+      <strong>{"★".repeat(reviews[0].rating)}{"☆".repeat(5 - reviews[0].rating)} · {reviews[0].parent_first_name} {reviews[0].parent_last_name}</strong>
+      <p>{reviews[0].comment}</p>
+    </> : <p className="muted">Схвалених відгуків поки немає.</p>}
+    <Link href="/teacher/reviews">Усі відгуки →</Link>
+  </section>;
+}
+
+
 type TeacherProfile = {
   firstName: string;
   lastName: string;
@@ -186,8 +207,10 @@ export function TeacherDashboard() {
               <Link href="/teacher/availability">Вільні години</Link>
               <Link href="/teacher/payouts">Виплати</Link>
               <Link href="/teacher/knowledge">База знань</Link>
+              <Link href="/teacher/reviews">Відгуки</Link>
             </div>
           </section>
+          <TeacherReviewsPreview />
           <section className="card teacher-knowledge-preview">
             <h2>База знань</h2>
             <p className="muted">Від першого уроку до виплат — короткі інструкції з переходами до дій.</p>
