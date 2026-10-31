@@ -75,7 +75,7 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
       setPhone(t.phone ?? "");
       setZoomUrl(t.zoomUrl ?? "");
       setStartedAt(t.startedAt?.slice(0, 10) ?? "");
-      setNewSubjectId(sub.find((item: any) => !t.subjects?.some((linked: any) => linked.id === item.id))?.id ?? "");
+      setNewSubjectId(sub.find((item: any) => item.status === "ACTIVE" && !t.subjects?.some((linked: any) => linked.id === item.id && linked.isActive))?.id ?? "");
       setRateSubjectId(t.subjects?.find((item: any) => item.isActive)?.id ?? "");
 
       if (user.permissions.includes("teacher.rate.view")) {
@@ -242,7 +242,7 @@ export function TeacherDetailPage({ role, teacherId }: { role: "ADMIN" | "MANAGE
   }
 
   const currentRateFor = (subjectId: string) => rates.filter((rate) => rate.subjectId === subjectId).at(-1);
-  const availableSubjects = subjects.filter((subject) => !teacher?.subjects?.some((linked: any) => linked.id === subject.id && linked.isActive));
+  const availableSubjects = subjects.filter((subject) => subject.status === "ACTIVE" && !teacher?.subjects?.some((linked: any) => linked.id === subject.id && linked.isActive));
   const allowedRoles = role === "ADMIN" ? ["ADMIN", "SUPPORT_MANAGER"] : ["MANAGER"];
 
   if (loading) return <PlatformShell allowedRoles={allowedRoles}><LoadingCard /></PlatformShell>;
