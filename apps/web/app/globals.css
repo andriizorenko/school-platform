@@ -2330,3 +2330,36 @@ th { background: rgba(247,249,255,.74); }
 .audit-table .audit-json { width:100%; max-width:100%; white-space:pre; overflow-wrap:normal; }
 :where(.setting-history-values dd,.audit-table-wrap,.audit-table summary,.audit-table .audit-json):focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
 @media(max-width:600px) { .setting-history-values { grid-template-columns:minmax(0,1fr); } }
+
+/* Teacher home keeps operational information compact and role-specific. */
+.teacher-dashboard-layout { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(260px,1fr); align-items:start; gap:16px; }
+.teacher-dashboard-layout > * { min-width:0; }
+.teacher-dashboard-layout .stack { gap:16px; }
+.teacher-referral { display:grid; gap:16px; background:linear-gradient(125deg,#f3f6ff,#ecf8ff); }
+.teacher-referral h2 { margin:0 0 6px; }
+.teacher-referral p { color:var(--muted); }
+.teacher-dashboard-heading { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px; }
+.teacher-dashboard-heading h2 { margin:0 0 5px; }
+.teacher-dashboard-heading > * { min-width:0; }
+.teacher-income { display:grid; gap:12px; }
+.teacher-income .segmented { max-width:100%; overflow-x:auto; }
+.teacher-income .segmented button { white-space:nowrap; }
+.teacher-income-amount { font-size:clamp(28px,3vw,38px); font-weight:800; letter-spacing:-.04em; }
+.teacher-income .link-button { justify-self:start; }
+.teacher-today { display:grid; gap:14px; }
+.teacher-today-list { display:grid; gap:8px; }
+.teacher-today-item { min-width:0; display:flex; gap:12px; align-items:center; flex-wrap:wrap; border:1px solid var(--border); border-radius:12px; background:#fcfcfd; padding:12px; }
+.teacher-today-item:hover { border-color:var(--accent); }
+.teacher-today-item:focus-visible { outline:3px solid rgba(74,99,231,.22); outline-offset:2px; }
+.teacher-today-item > span:nth-child(2) { min-width:140px; flex:1; overflow-wrap:anywhere; }
+.teacher-today-item small { display:block; margin-top:3px; }
+.teacher-dashboard-side .card { display:grid; gap:12px; }
+.teacher-dashboard-side .card h2 { margin:0; }
+.teacher-dashboard-name { font-size:18px; overflow-wrap:anywhere; }
+.teacher-dashboard-side .badge { justify-self:start; }
+.teacher-dashboard-side .btn { justify-self:start; }
+.teacher-dashboard-links { display:grid; gap:7px; }
+.teacher-dashboard-links a { padding:9px 0; border-bottom:1px solid var(--border); color:var(--accent); font-weight:700; }
+.teacher-dashboard-links a:last-child { border-bottom:0; }
+@media(max-width:900px){.teacher-dashboard-layout{grid-template-columns:1fr}}
+@media(max-width:560px){.teacher-today-item{align-items:flex-start}.teacher-today-item > strong{width:100%}.teacher-dashboard-heading .btn{width:100%;text-align:center}}

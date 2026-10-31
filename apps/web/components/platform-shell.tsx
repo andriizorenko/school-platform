@@ -46,7 +46,8 @@ const navByRole: Record<string, NavItem[]> = {
     { href: "/manager/payments", label: "Оплати" },
   ],
   TEACHER: [
-    { href: "/teacher", label: "Розклад" },
+    { href: "/teacher", label: "Головна" },
+    { href: "/teacher/schedule", label: "Календар" },
     { href: "/teacher/students", label: "Учні" },
     { href: "/teacher/availability", label: "Вільні години" },
     { href: "/teacher/payouts", label: "Виплати" },

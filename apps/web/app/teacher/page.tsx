@@ -1,2 +1,2 @@
-import { CalendarPage } from "../../components/calendar-page";
-export default function Page(){return <CalendarPage role="TEACHER"/>}
+import { TeacherDashboard } from "../../components/teacher-dashboard";
+export default function Page(){return <TeacherDashboard/>}

@@ -120,6 +120,15 @@ test.describe.serial("role beta smoke", () => {
     const account = accounts.teacher;
     await login(page, account);
     await expectHome(page, account);
+    await expect(page.getByRole("heading", { name: "Головна викладача" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Мій календар сьогодні" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Мій профіль" })).toBeVisible();
+    const period = page.getByRole("button", { name: "Період виплати" });
+    await expect(period).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Місяць" }).click();
+    await expect(page.getByRole("button", { name: "Місяць" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("link", { name: "Календар" }).first().click();
+    await expect(page).toHaveURL(/\/teacher\/schedule$/);
     await expect(page.getByRole("heading", { name: "Розклад" })).toBeVisible();
     await page.getByRole("link", { name: "Учні" }).first().click();
     await expect(page).toHaveURL(/\/teacher\/students$/);
