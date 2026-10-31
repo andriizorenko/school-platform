@@ -185,7 +185,14 @@ export function TeacherDashboard() {
               <Link href="/teacher/students">Мої учні</Link>
               <Link href="/teacher/availability">Вільні години</Link>
               <Link href="/teacher/payouts">Виплати</Link>
+              <Link href="/teacher/knowledge">База знань</Link>
             </div>
+          </section>
+          <section className="card teacher-knowledge-preview">
+            <h2>База знань</h2>
+            <p className="muted">Від першого уроку до виплат — короткі інструкції з переходами до дій.</p>
+            <Link href="/teacher/knowledge#first-lesson">Як провести перший урок →</Link>
+            <Link href="/teacher/knowledge#payouts">Як читати нарахування →</Link>
           </section>
         </aside>
       </div>}

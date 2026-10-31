@@ -127,6 +127,12 @@ test.describe.serial("role beta smoke", () => {
     await expect(period).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Місяць" }).click();
     await expect(page.getByRole("button", { name: "Місяць" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("link", { name: "База знань" }).first().click();
+    await expect(page).toHaveURL(/\/teacher\/knowledge$/);
+    await expect(page.getByRole("heading", { name: "База знань викладача" })).toBeVisible();
+    await page.getByRole("searchbox", { name: "Пошук по базі знань" }).fill("виплати");
+    await expect(page.getByRole("heading", { name: "Нарахування та виплати" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Перший урок" })).toHaveCount(0);
     await page.getByRole("link", { name: "Календар" }).first().click();
     await expect(page).toHaveURL(/\/teacher\/schedule$/);
     await expect(page.getByRole("heading", { name: "Розклад" })).toBeVisible();
