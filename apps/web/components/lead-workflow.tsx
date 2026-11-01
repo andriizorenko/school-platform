@@ -91,10 +91,10 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
             method: "POST", body: JSON.stringify({ studentId, subjectId, teacherId, startsAt }),
           });
           id = created.id; setSessionId(id);
-          await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, firstLessonSessionId: id }) });
+          await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, subjectId, firstLessonSessionId: id }) });
         }
         await api(`/leads/${lead.id}`, {
-          method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, firstLessonSessionId: id }),
+          method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, subjectId, firstLessonSessionId: id }),
         });
       } else if (status === "CONVERTED") {
         if (!studentId || !familyId || !subjectId || !teacherId) throw new Error("Оберіть учня, предмет і викладача.");
@@ -107,7 +107,7 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
           setEnrollmentId(id);
         }
         await api(`/enrollments/${id}/assign-teacher`, { method: "POST", body: JSON.stringify({ teacherId }) });
-        await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, convertedEnrollmentId: id }) });
+        await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, subjectId, convertedEnrollmentId: id }) });
         const versions = await api<any[]>(`/enrollments/${id}/schedule`);
         const sameDate = versions.find((version: any) => !version.effectiveUntil && version.effectiveFrom === date);
         if (sameDate) {
@@ -118,7 +118,7 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
           await api(`/enrollments/${id}/schedule`, { method: "PUT", body: JSON.stringify({ effectiveFrom: date, slots }) });
         }
         await api(`/leads/${lead.id}`, {
-          method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, convertedEnrollmentId: id }),
+          method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, subjectId, convertedEnrollmentId: id }),
         });
       } else {
         await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ status }) });
