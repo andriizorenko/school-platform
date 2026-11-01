@@ -152,6 +152,42 @@ async function run() {
   expectStatus(managerSettings, 403, "manager settings denied");
   assert.equal(managerSettings.payload?.error?.code, "PERMISSION_DENIED");
 
+  const ownProfile = await request("/users/me/profile", { cookie: manager.cookie });
+  expectStatus(ownProfile, 200, "manager own profile");
+  const changedProfile = await request("/users/me/profile", {
+    method: "PATCH", cookie: manager.cookie,
+    body: {
+      firstName: ownProfile.payload.firstName,
+      lastName: ownProfile.payload.lastName,
+      phone: "+380501234567",
+      email: ownProfile.payload.email,
+      telegramUsername: "@e2e_manager",
+    },
+  });
+  expectStatus(changedProfile, 200, "manager contact edit");
+  assert.equal(changedProfile.payload.telegramUsername, "e2e_manager");
+  assert.equal((await request("/users/me/profile", { cookie: manager.cookie })).payload.phone, "+380501234567");
+  const wrongPasswordEmail = await request("/users/me/profile", {
+    method: "PATCH", cookie: manager.cookie,
+    body: { ...changedProfile.payload, email: `wrong-${randomUUID()}@local.school`, currentPassword: "wrong-password" },
+  });
+  expectStatus(wrongPasswordEmail, 401, "email change requires current password");
+  assert.equal((await request("/users/me/profile", { cookie: manager.cookie })).payload.email, accounts.manager.email);
+
+  const newLead = await request("/leads", {
+    method: "POST", cookie: manager.cookie,
+    body: { source: "MANUAL", phone: "+380501234568", parentFirstName: "Followup", studentFirstName: "Student" },
+  });
+  expectStatus(newLead, 201, "create lead for follow-up");
+  expectStatus(await request(`/leads/${newLead.payload.id}`, {
+    method: "PATCH", cookie: manager.cookie, body: { status: "LOST" },
+  }), 400, "refusal requires a reason");
+  const lostLead = await request(`/leads/${newLead.payload.id}`, {
+    method: "PATCH", cookie: manager.cookie, body: { status: "LOST", refusalReason: "Не підійшов час" },
+  });
+  expectStatus(lostLead, 200, "save refusal reason");
+  assert.equal(lostLead.payload.refusal_reason, "Не підійшов час");
+
   const managerVacations = await request("/teacher-vacations?status=OPEN", { cookie: manager.cookie });
   expectStatus(managerVacations, 200, "manager vacation queue");
   assert.ok(Array.isArray(managerVacations.payload), "manager vacation queue must return an array");
