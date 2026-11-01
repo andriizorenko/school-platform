@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post } from "@nestjs/common";
 import { RequestId } from "../../common/request-id.decorator";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { Public } from "../auth/public.decorator";
@@ -6,8 +6,11 @@ import type { AuthUser } from "../auth/types";
 import { RequirePermissions } from "../iam/require-permissions.decorator";
 import { AcceptInvitationDto, CreateStudentAccountDto, ForgotPasswordDto, ResetPasswordDto, SuspendUserDto } from "./dto/account.dto";
 import { AccountsService } from "./accounts.service";
+import { UpdateMyProfileDto } from "./dto/update-my-profile.dto";
 @Controller()
 export class AccountsController {constructor(private readonly accounts:AccountsService){}
+  @Get("users/me/profile") myProfile(@CurrentUser() u:AuthUser){return this.accounts.getMyProfile(u.id);}
+  @Patch("users/me/profile") updateMyProfile(@Body() dto:UpdateMyProfileDto,@CurrentUser() u:AuthUser,@RequestId() rid?:string){return this.accounts.updateMyProfile(dto,u,rid);}
   @RequirePermissions("user.invite") @Post("users/:id/invite") invite(@Param("id",ParseUUIDPipe) id:string,@CurrentUser() u:AuthUser,@RequestId() rid?:string){return this.accounts.invite(id,u,rid);}
   @Public() @Post("auth/invitations/accept") accept(@Body() dto:AcceptInvitationDto){return this.accounts.acceptInvitation(dto.token,dto.password);}
   @Public() @Post("auth/password/forgot") forgot(@Body() dto:ForgotPasswordDto){return this.accounts.forgot(dto.email);}
