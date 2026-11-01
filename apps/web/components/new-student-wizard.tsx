@@ -13,7 +13,7 @@ function todayDate() {
   return kyivDateValue();
 }
 
-export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; onDone: () => void }) {
+export function NewStudentWizard({ role, onDone, buttonLabel = "+ Новий учень", initial, createOnly = false }: { role: "ADMIN" | "MANAGER"; onDone: (result?: { familyId: string; studentId: string }) => void; buttonLabel?: string; initial?: Partial<{ parentFirstName: string; parentLastName: string; email: string; phone: string; studentFirstName: string; studentLastName: string; gradeLevel: number | string; subjectId: string }>; createOnly?: boolean }) {
   const [open, setOpen] = useState(false);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
@@ -42,7 +42,7 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
     if (!open) return;
     Promise.all([api<any[]>("/subjects"), api<any[]>("/staff/managers"), api<{ user: Me }>("/auth/me")])
       .then(([subjectRows, managerRows, current]) => {
-        setSubjects(subjectRows);
+        setSubjects(subjectRows.filter((subject: any) => subject.status === "ACTIVE"));
         setManagers(managerRows);
         setForm((previous: any) => ({ ...previous, managerUserId: role === "MANAGER" ? current.user.id : previous.managerUserId }));
       })
@@ -104,7 +104,7 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
         });
       }
 
-      if (form.subjectId) {
+      if (!createOnly && form.subjectId) {
         const durationMinutes = slots[0]?.durationMinutes ?? 60;
         const enrollment = await api<any>(`/students/${student.id}/enrollments`, {
           method: "POST",
@@ -128,7 +128,7 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
       await api(`/users/${family.parent.userId}/invite`, { method: "POST" }).catch(() => null);
       if (student.userId) await api(`/users/${student.userId}/invite`, { method: "POST" }).catch(() => null);
       setOpen(false);
-      onDone();
+      onDone({ familyId: family.id, studentId: student.id });
     } catch (exception: any) {
       setError(exception.message ?? "Не вдалося створити учня");
     } finally {
@@ -137,7 +137,7 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
   }
 
   return <>
-    <button className="btn" onClick={() => setOpen(true)}>+ Новий учень</button>
+    <button className="btn" type="button" onClick={() => { if (initial) setForm((previous: any) => ({ ...previous, ...initial, gradeLevel: initial.gradeLevel ?? "" })); setOpen(true); }}>{buttonLabel}</button>
     {open && <div className="sheet-backdrop" onClick={() => setOpen(false)}>
       <aside className="sheet wide-sheet onboarding-sheet" onClick={(event) => event.stopPropagation()}>
         <button className="sheet-close" onClick={() => setOpen(false)}>×</button>
@@ -165,7 +165,7 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
             </div>
           </section>
 
-          <section className="stack onboarding-section">
+          {!createOnly && <section className="stack onboarding-section">
             <h3>3. Навчання і бажаний графік</h3>
             <div className="grid cols-2">
               <div className="field"><label>Предмет</label><select className="select" value={form.subjectId} onChange={(event) => field("subjectId", event.target.value)}><option value="">Додати пізніше</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></div>
@@ -191,9 +191,9 @@ export function NewStudentWizard({ role, onDone }: { role: "ADMIN" | "MANAGER"; 
               onSelect={setSelectedTeacher}
             />}
             {selectedTeacher && <div className="success">Обрано: <strong>{selectedTeacher.lastName} {selectedTeacher.firstName}</strong> · {selectedSubject?.name}. Після створення одразу призначимо викладача і регулярний графік.</div>}
-          </section>
+          </section>}
 
-          <button className="btn" disabled={busy}>{busy ? "Створюємо…" : selectedTeacher ? "Створити сімʼю, учня і графік" : "Створити та надіслати запрошення"}</button>
+          <button className="btn" disabled={busy}>{busy ? "Створюємо…" : createOnly ? "Створити сімʼю та учня" : selectedTeacher ? "Створити сімʼю, учня і графік" : "Створити та надіслати запрошення"}</button>
         </form>
       </aside>
     </div>}
