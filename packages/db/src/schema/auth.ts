@@ -26,6 +26,8 @@ export const users = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     email: citext("email").notNull().unique(),
+    contactPhone: text("contact_phone"),
+    telegramUsername: text("telegram_username"),
     passwordHash: text("password_hash"),
     status: userStatusEnum("status").notNull().default("PENDING"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
