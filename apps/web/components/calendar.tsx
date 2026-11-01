@@ -529,7 +529,7 @@ export function SchoolCalendar({ role, query = "" }: { role: CalendarRole; query
       </section>
     </div>}
 
-    {selected && <div className="sheet-backdrop" onClick={()=>setSelected(null)}><aside className="sheet" onClick={e=>e.stopPropagation()}><button className="sheet-close" onClick={()=>setSelected(null)}>×</button>{detailLoading?<div className="empty">Завантаження…</div>:detail?<div className="stack" style={{marginTop:40}}>
+    {selected && <div className="sheet-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setSelected(null)}}><aside className="sheet" onClick={e=>e.stopPropagation()}><button className="sheet-close" onClick={()=>setSelected(null)}>×</button>{detailLoading?<div className="empty">Завантаження…</div>:detail?<div className="stack" style={{marginTop:40}}>
       <div><h2>{detail.student.lastName} {detail.student.firstName}</h2><p className="muted">{detail.student.gradeLevel?`${detail.student.gradeLevel} клас · `:""}{detail.subject.name}</p></div>
       <div><strong>{dateTime(detail.startsAt)}</strong><div className="muted">до {timeOnly(detail.endsAt)}</div></div>
       <div className="row"><span className={`badge ${detail.sessionType==="FIRST"?"first":""}`}>{detail.sessionType==="FIRST"?"Перше":"Регулярне"}</span><span className={`badge ${detail.fundingStatus.toLowerCase()}`}>{detail.fundingStatus==="PAID"?"Сплачено":"Бронь"}</span>{detail.status==="COMPLETED"&&<span className="badge success-badge">Проведено</span>}{detail.status==="CHARGED_NO_SHOW"&&<span className="badge charged-no-show-badge">Списано · пропуск</span>}{detail.status==="CANCELLED"&&<span className="badge cancelled-badge">Скасовано</span>}{detail.needsReport&&<span className="badge report">ТРЕБА ЗВІТ</span>}</div>
