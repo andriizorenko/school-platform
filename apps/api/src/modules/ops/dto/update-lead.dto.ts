@@ -4,6 +4,7 @@ export class UpdateLeadDto {
   @IsIn(["NEW", "CONTACTED", "FIRST_LESSON", "CONVERTED", "LOST"]) @IsOptional()
   status?: "NEW" | "CONTACTED" | "FIRST_LESSON" | "CONVERTED" | "LOST";
   @IsUUID() @IsOptional() primaryManagerId?: string;
+  @IsUUID() @IsOptional() subjectId?: string;
   @IsUUID() @IsOptional() convertedFamilyId?: string;
   @IsUUID() @IsOptional() convertedStudentId?: string;
   @IsUUID() @IsOptional() firstLessonSessionId?: string;
