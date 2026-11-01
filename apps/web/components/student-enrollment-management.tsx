@@ -191,7 +191,7 @@ export function StudentEnrollmentManagement({ student, enrollment, balance, sche
 
     {error && !mode && <div className="error">{error}</div>}
 
-    {mode && <div className="sheet-backdrop" onClick={() => !busy && setMode(null)}>
+    {mode && <div className="sheet-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setMode(null); }}>
       <aside className={`sheet ${mode === "teacher" ? "wide-sheet" : ""}`} onClick={(event) => event.stopPropagation()}>
         <button type="button" className="sheet-close" aria-label="Закрити керування навчанням" disabled={busy} onClick={() => setMode(null)}>×</button>
         <div className="stack management-sheet-body">
