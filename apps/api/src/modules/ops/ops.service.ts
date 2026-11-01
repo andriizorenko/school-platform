@@ -527,6 +527,11 @@ export class OpsService {
       const before = locked.rows[0] as any;
       const studentId = dto.convertedStudentId ?? before.converted_student_id;
       const familyId = dto.convertedFamilyId ?? before.converted_family_id;
+      const subjectId = dto.subjectId ?? before.subject_id;
+      if (dto.subjectId) {
+        const subject = await tx.execute(sql`SELECT 1 FROM subjects WHERE id=${dto.subjectId} AND status='ACTIVE' LIMIT 1`);
+        if (!subject.rowCount) throw new BadRequestException({ code: "SUBJECT_NOT_ACTIVE", message: "Select an active subject" });
+      }
       if (studentId) {
         const student = await tx.execute(sql`SELECT family_id FROM students WHERE id=${studentId} AND archived_at IS NULL`);
         if (!student.rowCount || (familyId && (student.rows[0] as any).family_id !== familyId)) {
@@ -541,7 +546,8 @@ export class OpsService {
         if (!studentId || !sessionId) throw new BadRequestException({ code: "LEAD_FIRST_LESSON_REQUIRED", message: "Link a student and schedule the first lesson" });
         const session = await tx.execute(sql`
           SELECT 1 FROM live_sessions WHERE id=${sessionId} AND student_id=${studentId}
-            AND session_type='FIRST' AND status IN ('SCHEDULED','COMPLETED') LIMIT 1
+            AND session_type='FIRST' AND status IN ('SCHEDULED','COMPLETED')
+            AND (${subjectId}::uuid IS NULL OR subject_id=${subjectId}) LIMIT 1
         `);
         if (!session.rowCount) throw new BadRequestException({ code: "LEAD_FIRST_LESSON_MISMATCH", message: "The first lesson does not belong to this student" });
       }
@@ -551,6 +557,7 @@ export class OpsService {
         const enrollment = await tx.execute(sql`
           SELECT 1 FROM student_subject_enrollments e
           WHERE e.id=${enrollmentId} AND e.student_id=${studentId} AND e.status='ACTIVE'
+            AND (${subjectId}::uuid IS NULL OR e.subject_id=${subjectId})
             AND EXISTS(SELECT 1 FROM teacher_assignments ta WHERE ta.enrollment_id=e.id AND ta.ended_at IS NULL)
             AND EXISTS(SELECT 1 FROM regular_schedule_versions v WHERE v.enrollment_id=e.id)
           LIMIT 1
@@ -559,6 +566,7 @@ export class OpsService {
       }
       const result = await tx.execute(sql`
         UPDATE leads SET status=COALESCE(${dto.status ?? null}::lead_status,status),
+          subject_id=COALESCE(${dto.subjectId ?? null}::uuid,subject_id),
           primary_manager_id=COALESCE(${dto.primaryManagerId ?? null}::uuid,primary_manager_id),
           converted_family_id=COALESCE(${dto.convertedFamilyId ?? null}::uuid,converted_family_id),
           converted_student_id=COALESCE(${dto.convertedStudentId ?? null}::uuid,converted_student_id),
