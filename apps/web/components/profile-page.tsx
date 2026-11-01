@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, type Me } from "../lib/api";
 import { dateTime } from "../lib/format";
 import { PlatformShell } from "./platform-shell";
 import { TeacherSelfProfileCard } from "./teacher-self-profile-card";
+
+type PersonalProfile = { firstName: string; lastName: string; email: string; phone: string; telegramUsername: string };
 
 type Preference = {
   eventType: string;
@@ -80,6 +82,9 @@ function notificationStatus(status: NotificationItem["status"]) {
 export function ProfilePage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
+  const [personal, setPersonal] = useState<PersonalProfile | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [savingPersonal, setSavingPersonal] = useState(false);
   const [prefs, setPrefs] = useState<Preference[]>([]);
   const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -92,8 +97,9 @@ export function ProfilePage() {
 
   async function load() {
     try {
-      const [{ user }, p, t, history, s, m] = await Promise.all([
+      const [{ user }, profile, p, t, history, s, m] = await Promise.all([
         api<{ user: Me }>("/auth/me"),
+        api<PersonalProfile>("/users/me/profile"),
         api<Preference[]>("/notifications/preferences").catch(() => []),
         api<TelegramStatus>("/notifications/telegram").catch(() => null),
         api<NotificationItem[]>("/notifications?limit=12").catch(() => []),
@@ -101,6 +107,7 @@ export function ProfilePage() {
         api<any>("/auth/mfa/status").catch(() => null),
       ]);
       setMe(user);
+      setPersonal(profile);
       setPrefs(p);
       setTelegram(t);
       setNotifications(history);
@@ -165,6 +172,26 @@ export function ProfilePage() {
       setError(e.message);
     } finally {
       setBusyEvent(null);
+    }
+  }
+
+  async function savePersonal(event: FormEvent) {
+    event.preventDefault();
+    if (!personal || savingPersonal) return;
+    setSavingPersonal(true); setError(""); setMessage("");
+    try {
+      const updated = await api<PersonalProfile>("/users/me/profile", {
+        method: "PATCH",
+        body: JSON.stringify({ ...personal, currentPassword: personal.email.trim().toLowerCase() !== me?.email.toLowerCase() ? currentPassword : undefined }),
+      });
+      setPersonal(updated);
+      setMe((current) => current ? { ...current, email: updated.email } : current);
+      setCurrentPassword("");
+      setMessage("Контактні дані оновлено.");
+    } catch (value: any) {
+      setError(value.message ?? "Не вдалося оновити профіль.");
+    } finally {
+      setSavingPersonal(false);
     }
   }
 
@@ -237,6 +264,18 @@ export function ProfilePage() {
             <strong>{me?.email ?? "…"}</strong>
             <div className="muted">{me?.roles.map((role) => roleLabel[role] ?? role).join(" · ")}</div>
           </div>
+          {personal && <form className="stack" onSubmit={savePersonal}>
+            <div className="grid cols-2">
+              <div className="field"><label htmlFor="my-first-name">Імʼя</label><input id="my-first-name" className="input" required value={personal.firstName} onChange={(event) => setPersonal({ ...personal, firstName: event.target.value })} /></div>
+              <div className="field"><label htmlFor="my-last-name">Прізвище</label><input id="my-last-name" className="input" required value={personal.lastName} onChange={(event) => setPersonal({ ...personal, lastName: event.target.value })} /></div>
+              <div className="field"><label htmlFor="my-email">Email для входу</label><input id="my-email" className="input" type="email" required value={personal.email} onChange={(event) => setPersonal({ ...personal, email: event.target.value })} /></div>
+              <div className="field"><label htmlFor="my-phone">Телефон</label><input id="my-phone" className="input" type="tel" value={personal.phone} onChange={(event) => setPersonal({ ...personal, phone: event.target.value })} /></div>
+              <div className="field"><label htmlFor="my-telegram-contact">Контактний Telegram</label><input id="my-telegram-contact" className="input" placeholder="@username" value={personal.telegramUsername} onChange={(event) => setPersonal({ ...personal, telegramUsername: event.target.value })} /></div>
+              {personal.email.trim().toLowerCase() !== me?.email.toLowerCase() && <div className="field"><label htmlFor="my-current-password">Поточний пароль для зміни email</label><input id="my-current-password" className="input" type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></div>}
+            </div>
+            <p className="muted">Контактний Telegram — це вказаний вами нік; підключення бота підтверджується окремо.</p>
+            <button className="btn secondary" disabled={savingPersonal}>{savingPersonal ? "Зберігаємо…" : "Зберегти дані"}</button>
+          </form>}
           {privileged && (
             <div className="row">
               <span className={`badge ${mfa?.enabled ? "paid" : "booked"}`}>
