@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 import { phoneNumber, subjectCount } from "../lib/format";
 import { useData } from "../lib/use-data";
 import { ErrorCard, LoadingCard } from "./loadable";
@@ -9,6 +10,8 @@ import { NewStudentWizard } from "./new-student-wizard";
 import { PlatformShell } from "./platform-shell";
 
 export function FamiliesList({ role }: { role: "ADMIN" | "MANAGER" }) {
+  const router = useRouter();
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const [search, setSearch] = useState("");
   const [lifecycle, setLifecycle] = useState("ACTIVE");
   const [mine, setMine] = useState(role === "MANAGER");
@@ -31,7 +34,7 @@ export function FamiliesList({ role }: { role: "ADMIN" | "MANAGER" }) {
           <h1>Сімʼї</h1>
           <p className="muted">Один батьківський акаунт, усі діти, відповідальні менеджери та життєвий цикл сімʼї.</p>
         </div>
-        <NewStudentWizard role={role} onDone={reload} />
+        <NewStudentWizard role={role} onDone={reload} buttonLabel="+ Додати сімʼю" />
       </div>
 
       <div className="card row wrap-row families-filter-card">
@@ -88,7 +91,17 @@ export function FamiliesList({ role }: { role: "ADMIN" | "MANAGER" }) {
             </thead>
             <tbody>
               {(data ?? []).map((family: any) => (
-                <tr key={family.id}>
+                <tr key={family.id} role="link" tabIndex={0} aria-label={`Відкрити сімʼю ${family.parentLastName} ${family.parentFirstName}`} style={{ cursor: "pointer" }}
+                  onMouseDown={(event) => { pointerStart.current = { x: event.clientX, y: event.clientY }; }}
+                  onClick={(event) => {
+                    const start = pointerStart.current;
+                    pointerStart.current = null;
+                    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 4) return;
+                    if (window.getSelection()?.toString().trim()) return;
+                    if ((event.target as HTMLElement).closest("a, button, input, select, textarea")) return;
+                    router.push(`${base}/families/${family.id}`);
+                  }}
+                  onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`${base}/families/${family.id}`); } }}>
                   <td>
                     <Link href={`${base}/families/${family.id}`}>
                       <strong>{family.parentLastName} {family.parentFirstName}</strong>
