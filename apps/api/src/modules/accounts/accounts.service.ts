@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import type { Database } from "@school/db";
 import { sql } from "drizzle-orm";
 import argon2 from "argon2";
@@ -7,6 +7,8 @@ import { DATABASE } from "../../common/database/database.constants";
 import type { AuthUser } from "../auth/types";
 import { AuditService } from "../audit/audit.service";
 import { OutboxService } from "../audit/outbox.service";
+import { isPgUniqueViolation } from "../../common/database/pg-errors";
+import type { UpdateMyProfileDto } from "./dto/update-my-profile.dto";
 
 @Injectable()
 export class AccountsService {
@@ -20,6 +22,92 @@ export class AccountsService {
     return createHash("sha256").update(token).digest("hex");
   }
 
+
+  async getMyProfile(userId: string) {
+    const result = await this.db.execute(sql`
+      SELECT u.id, u.email, u.telegram_username,
+        COALESCE(pp.first_name, tp.first_name, sp.first_name, st.first_name) AS first_name,
+        COALESCE(pp.last_name, tp.last_name, sp.last_name, st.last_name) AS last_name,
+        COALESCE(pp.phone, tp.phone, sp.phone, u.contact_phone) AS phone
+      FROM users u
+      LEFT JOIN parent_profiles pp ON pp.user_id = u.id
+      LEFT JOIN teacher_profiles tp ON tp.user_id = u.id
+      LEFT JOIN staff_profiles sp ON sp.user_id = u.id
+      LEFT JOIN students st ON st.user_id = u.id
+      WHERE u.id = ${userId}
+      LIMIT 1
+    `);
+    if (!result.rowCount) throw new NotFoundException({ code: "USER_NOT_FOUND", message: "User not found" });
+    const row = result.rows[0] as any;
+    return {
+      firstName: row.first_name ?? "",
+      lastName: row.last_name ?? "",
+      email: row.email,
+      phone: row.phone ?? "",
+      telegramUsername: row.telegram_username ?? "",
+    };
+  }
+
+  async updateMyProfile(dto: UpdateMyProfileDto, actor: AuthUser, requestId?: string) {
+    const firstName = dto.firstName.trim();
+    const lastName = dto.lastName.trim();
+    const phone = dto.phone.trim();
+    const email = dto.email.trim().toLowerCase();
+    const telegramUsername = dto.telegramUsername.trim().replace(/^@/, "");
+    if (!firstName || !lastName) {
+      throw new BadRequestException({ code: "PROFILE_NAME_REQUIRED", message: "First and last name are required" });
+    }
+    try {
+      await this.db.transaction(async (tx) => {
+        const locked = await tx.execute(sql`SELECT email,password_hash FROM users WHERE id=${actor.id} FOR UPDATE`);
+        if (!locked.rowCount) throw new NotFoundException({ code: "USER_NOT_FOUND", message: "User not found" });
+        const current = locked.rows[0] as { email: string; password_hash: string | null };
+        const emailChanged = current.email.toLowerCase() !== email;
+        if (emailChanged) {
+          if (!current.password_hash || !dto.currentPassword || !(await argon2.verify(current.password_hash, dto.currentPassword))) {
+            throw new UnauthorizedException({ code: "CURRENT_PASSWORD_INVALID", message: "Confirm the current password to change email" });
+          }
+          const duplicate = await tx.execute(sql`SELECT 1 FROM users WHERE email=${email} AND id<>${actor.id} LIMIT 1`);
+          if (duplicate.rowCount) throw new ConflictException({ code: "EMAIL_ALREADY_IN_USE", message: "Email is already in use" });
+        }
+        if (!phone) {
+          const requiredPhone = await tx.execute(sql`
+            SELECT EXISTS(SELECT 1 FROM parent_profiles WHERE user_id=${actor.id})
+              OR EXISTS(SELECT 1 FROM teacher_profiles WHERE user_id=${actor.id}) AS required
+          `);
+          if ((requiredPhone.rows[0] as any).required) {
+            throw new BadRequestException({ code: "PROFILE_PHONE_REQUIRED", message: "Phone is required for this account" });
+          }
+        }
+        await tx.execute(sql`
+          UPDATE users SET email=${email}, contact_phone=${phone || null},
+            telegram_username=${telegramUsername || null},
+            email_verified_at=CASE WHEN ${emailChanged} THEN NULL ELSE email_verified_at END,
+            updated_at=now() WHERE id=${actor.id}
+        `);
+        await tx.execute(sql`UPDATE parent_profiles SET first_name=${firstName},last_name=${lastName},phone=${phone},updated_at=now() WHERE user_id=${actor.id}`);
+        await tx.execute(sql`UPDATE teacher_profiles SET first_name=${firstName},last_name=${lastName},phone=${phone},updated_at=now() WHERE user_id=${actor.id}`);
+        await tx.execute(sql`UPDATE staff_profiles SET first_name=${firstName},last_name=${lastName},phone=${phone || null},updated_at=now() WHERE user_id=${actor.id}`);
+        await tx.execute(sql`UPDATE students SET first_name=${firstName},last_name=${lastName},updated_at=now() WHERE user_id=${actor.id}`);
+        await this.audit.record({
+          actorUserId: actor.id,
+          actorRoleCode: actor.roles[0],
+          action: "UPDATE_OWN_PROFILE",
+          entityType: "User",
+          entityId: actor.id,
+          requestId,
+          beforeData: { email: current.email },
+          afterData: { email, firstName, lastName, phone, telegramUsername, emailChanged },
+        }, tx as any);
+      });
+    } catch (error) {
+      if (isPgUniqueViolation(error)) {
+        throw new ConflictException({ code: "EMAIL_ALREADY_IN_USE", message: "Email is already in use" });
+      }
+      throw error;
+    }
+    return this.getMyProfile(actor.id);
+  }
 
   async invite(userId: string, actor: AuthUser, requestId?: string) {
     return this.db.transaction(async (tx) => {
