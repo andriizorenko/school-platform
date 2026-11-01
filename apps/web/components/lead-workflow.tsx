@@ -82,7 +82,7 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
         if (!reason.trim()) throw new Error("Вкажіть причину відмови.");
         await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ status, refusalReason: reason.trim() }) });
       } else if (status === "FIRST_LESSON") {
-        if (!studentId || !familyId || !subjectId || !teacherId) throw new Error("Оберіть учня, предмет і викладача.");
+        if (!studentId || !familyId || (!sessionId && (!subjectId || !teacherId))) throw new Error("Оберіть учня, предмет і викладача.");
         let id = sessionId;
         if (!id) {
           const startsAt = kyivLocalDateTimeToIso(`${date}T${time}`);
@@ -91,6 +91,7 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
             method: "POST", body: JSON.stringify({ studentId, subjectId, teacherId, startsAt }),
           });
           id = created.id; setSessionId(id);
+          await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, firstLessonSessionId: id }) });
         }
         await api(`/leads/${lead.id}`, {
           method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, firstLessonSessionId: id }),
@@ -106,7 +107,16 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
           setEnrollmentId(id);
         }
         await api(`/enrollments/${id}/assign-teacher`, { method: "POST", body: JSON.stringify({ teacherId }) });
-        await api(`/enrollments/${id}/schedule`, { method: "PUT", body: JSON.stringify({ effectiveFrom: date, slots }) });
+        await api(`/leads/${lead.id}`, { method: "PATCH", body: JSON.stringify({ convertedFamilyId: familyId, convertedStudentId: studentId, convertedEnrollmentId: id }) });
+        const versions = await api<any[]>(`/enrollments/${id}/schedule`);
+        const sameDate = versions.find((version: any) => !version.effectiveUntil && version.effectiveFrom === date);
+        if (sameDate) {
+          const sameSlots = sameDate.slots.length === slots.length && slots.every(slot => sameDate.slots.some((saved: any) =>
+            saved.dayOfWeek === slot.dayOfWeek && String(saved.startTime).slice(0, 5) === slot.startTime && saved.durationMinutes === slot.durationMinutes));
+          if (!sameSlots) throw new Error("На цю дату вже є інший графік. Змініть дату або відкрийте графік у картці учня.");
+        } else {
+          await api(`/enrollments/${id}/schedule`, { method: "PUT", body: JSON.stringify({ effectiveFrom: date, slots }) });
+        }
         await api(`/leads/${lead.id}`, {
           method: "PATCH", body: JSON.stringify({ status, convertedFamilyId: familyId, convertedStudentId: studentId, convertedEnrollmentId: id }),
         });
@@ -143,7 +153,7 @@ export function LeadWorkflow({ lead: initial, status: initialStatus, role, onClo
           <div className="field"><label htmlFor="lead-subject">Предмет</label><select id="lead-subject" className="select" value={subjectId} onChange={event => { setSubjectId(event.target.value); setTeacherId(""); setEnrollmentId(""); }}><option value="">Оберіть предмет</option>{subjects.map((item: any) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>
           <div className="field"><label htmlFor="lead-teacher">Викладач</label><select id="lead-teacher" className="select" value={teacherId} onChange={event => setTeacherId(event.target.value)}><option value="">Оберіть викладача</option>{teacherOptions.map((item: any) => <option key={item.userId} value={item.userId}>{item.lastName} {item.firstName}</option>)}</select></div>
           <div className="field"><label htmlFor="lead-date">{status === "FIRST_LESSON" ? "Дата першого уроку" : "Початок регулярного графіка"}</label><input id="lead-date" className="input" type="date" min={kyivDateValue()} value={date} onChange={event => setDate(event.target.value)} /></div>
-          {status === "FIRST_LESSON" ? <div className="field"><label>Час першого уроку</label><TimeSelect24 value={time} onChange={setTime} /></div> : <>
+          {status === "FIRST_LESSON" ? <>{sessionId && <p className="muted">Перший урок уже створено. Час можна змінити в календарі.</p>}<div className="field"><label htmlFor="lead-time">Час першого уроку</label><TimeSelect24 id="lead-time" value={time} onChange={setTime} disabled={Boolean(sessionId)} /></div></> : <>
             <div className="row"><strong>Регулярні години</strong><button className="btn secondary" type="button" onClick={() => setSlots(current => [...current, { dayOfWeek: 1, startTime: "17:00", durationMinutes: 60 }])}>+ Додати час</button></div>
             {slots.map((slot, index) => <div className="row wrap-row" key={index}>
               <select className="select" aria-label="День" value={slot.dayOfWeek} onChange={event => setSlots(current => current.map((item, i) => i === index ? { ...item, dayOfWeek: Number(event.target.value) } : item))}>{weekdays.slice(1).map((day, i) => <option key={i + 1} value={i + 1}>{day}</option>)}</select>
