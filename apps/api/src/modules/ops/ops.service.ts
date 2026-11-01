@@ -520,8 +520,60 @@ export class OpsService {
     `); return r.rows[0];
   }
   async leads(status?:string) { const r=await this.db.execute(sql`SELECT l.*,s.name subject_name,sp.first_name manager_first_name,sp.last_name manager_last_name,c.title source_course_title,topic.name source_topic_name,ta.percentage source_test_percentage FROM leads l LEFT JOIN subjects s ON s.id=l.subject_id LEFT JOIN staff_profiles sp ON sp.user_id=l.primary_manager_id LEFT JOIN courses c ON c.id=l.source_course_id LEFT JOIN subject_topics topic ON topic.id=l.source_topic_id LEFT JOIN test_attempts ta ON ta.id=l.source_test_attempt_id WHERE (${status??null}::text IS NULL OR l.status::text=${status??null}) ORDER BY l.created_at DESC LIMIT 300`); return r.rows; }
-  async updateLead(id:string,dto:UpdateLeadDto,actor:AuthUser,requestId?:string) {
-    return this.db.transaction(async tx=>{const before=await tx.execute(sql`SELECT * FROM leads WHERE id=${id} FOR UPDATE`); if(!before.rowCount) throw new NotFoundException({code:"LEAD_NOT_FOUND",message:"Lead not found"}); const r=await tx.execute(sql`UPDATE leads SET status=COALESCE(${dto.status??null}::lead_status,status),primary_manager_id=COALESCE(${dto.primaryManagerId??null}::uuid,primary_manager_id),updated_at=now() WHERE id=${id} RETURNING *`); await this.audit.record({actorUserId:actor.id,actorRoleCode:actor.roles[0],action:"UPDATE_LEAD",entityType:"Lead",entityId:id,beforeData:before.rows[0],afterData:r.rows[0],requestId},tx as any); return r.rows[0];});
+  async updateLead(id: string, dto: UpdateLeadDto, actor: AuthUser, requestId?: string) {
+    return this.db.transaction(async (tx) => {
+      const locked = await tx.execute(sql`SELECT * FROM leads WHERE id=${id} FOR UPDATE`);
+      if (!locked.rowCount) throw new NotFoundException({ code: "LEAD_NOT_FOUND", message: "Lead not found" });
+      const before = locked.rows[0] as any;
+      const studentId = dto.convertedStudentId ?? before.converted_student_id;
+      const familyId = dto.convertedFamilyId ?? before.converted_family_id;
+      if (studentId) {
+        const student = await tx.execute(sql`SELECT family_id FROM students WHERE id=${studentId} AND archived_at IS NULL`);
+        if (!student.rowCount || (familyId && (student.rows[0] as any).family_id !== familyId)) {
+          throw new BadRequestException({ code: "LEAD_STUDENT_MISMATCH", message: "Student must belong to the linked active family" });
+        }
+      }
+      if (dto.status === "LOST" && !dto.refusalReason?.trim()) {
+        throw new BadRequestException({ code: "LEAD_REFUSAL_REASON_REQUIRED", message: "Enter the reason for refusal" });
+      }
+      if (dto.status === "FIRST_LESSON") {
+        const sessionId = dto.firstLessonSessionId ?? before.first_lesson_session_id;
+        if (!studentId || !sessionId) throw new BadRequestException({ code: "LEAD_FIRST_LESSON_REQUIRED", message: "Link a student and schedule the first lesson" });
+        const session = await tx.execute(sql`
+          SELECT 1 FROM live_sessions WHERE id=${sessionId} AND student_id=${studentId}
+            AND session_type='FIRST' AND status IN ('SCHEDULED','COMPLETED') LIMIT 1
+        `);
+        if (!session.rowCount) throw new BadRequestException({ code: "LEAD_FIRST_LESSON_MISMATCH", message: "The first lesson does not belong to this student" });
+      }
+      if (dto.status === "CONVERTED") {
+        const enrollmentId = dto.convertedEnrollmentId ?? before.converted_enrollment_id;
+        if (!studentId || !enrollmentId) throw new BadRequestException({ code: "LEAD_REGULAR_SCHEDULE_REQUIRED", message: "Link a student and configure regular lessons" });
+        const enrollment = await tx.execute(sql`
+          SELECT 1 FROM student_subject_enrollments e
+          WHERE e.id=${enrollmentId} AND e.student_id=${studentId} AND e.status='ACTIVE'
+            AND EXISTS(SELECT 1 FROM teacher_assignments ta WHERE ta.enrollment_id=e.id AND ta.ended_at IS NULL)
+            AND EXISTS(SELECT 1 FROM regular_schedule_versions v WHERE v.enrollment_id=e.id)
+          LIMIT 1
+        `);
+        if (!enrollment.rowCount) throw new BadRequestException({ code: "LEAD_REGULAR_SCHEDULE_REQUIRED", message: "Assign a teacher and configure regular lessons first" });
+      }
+      const result = await tx.execute(sql`
+        UPDATE leads SET status=COALESCE(${dto.status ?? null}::lead_status,status),
+          primary_manager_id=COALESCE(${dto.primaryManagerId ?? null}::uuid,primary_manager_id),
+          converted_family_id=COALESCE(${dto.convertedFamilyId ?? null}::uuid,converted_family_id),
+          converted_student_id=COALESCE(${dto.convertedStudentId ?? null}::uuid,converted_student_id),
+          first_lesson_session_id=COALESCE(${dto.firstLessonSessionId ?? null}::uuid,first_lesson_session_id),
+          converted_enrollment_id=COALESCE(${dto.convertedEnrollmentId ?? null}::uuid,converted_enrollment_id),
+          refusal_reason=CASE WHEN ${dto.status ?? null}::lead_status='LOST' THEN ${dto.refusalReason?.trim() ?? null}
+            WHEN ${dto.status ?? null}::lead_status IS NOT NULL THEN NULL ELSE refusal_reason END,
+          updated_at=now() WHERE id=${id} RETURNING *
+      `);
+      await this.audit.record({
+        actorUserId: actor.id, actorRoleCode: actor.roles[0], action: "UPDATE_LEAD",
+        entityType: "Lead", entityId: id, beforeData: before, afterData: result.rows[0], requestId,
+      }, tx as any);
+      return result.rows[0];
+    });
   }
 
   async createTeacherApplication(dto:CreateTeacherApplicationDto) {
