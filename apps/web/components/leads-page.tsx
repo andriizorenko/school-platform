@@ -6,18 +6,20 @@ import { api } from "../lib/api";
 import { useData } from "../lib/use-data";
 import { ErrorCard, LoadingCard } from "./loadable";
 import { phoneNumber } from "../lib/format";
+import { LeadWorkflow } from "./lead-workflow";
 
 const statusLabels: Record<string, string> = {
   NEW: "Нова",
   CONTACTED: "Звʼязалися",
-  FIRST_LESSON: "Перше заняття",
-  CONVERTED: "Стала клієнтом",
-  LOST: "Закрита",
+  FIRST_LESSON: "Записались на перше заняття",
+  CONVERTED: "Записались на регулярні заняття",
+  LOST: "Відмовились",
 };
 
 const sourceLabels: Record<string, string> = {
   MANUAL: "Вручну",
-  WEBSITE: "Сайт",
+  WEBSITE_SIGNUP: "Сайт",
+  OTHER: "Інше",
   CALLBACK: "Зворотний дзвінок",
   COURSE: "Курс",
 };
@@ -26,6 +28,8 @@ const statuses = ["NEW", "CONTACTED", "FIRST_LESSON", "CONVERTED", "LOST"];
 
 export function LeadsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
   const [status, setStatus] = useState("");
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<"NEW" | "CONTACTED" | "FIRST_LESSON" | "CONVERTED" | "LOST">("NEW");
   const { data, error, loading, reload } = useData<any[]>(`/leads${status ? `?status=${status}` : ""}`);
   const [phone, setPhone] = useState("");
   const [parentFirstName, setParentFirstName] = useState("");
@@ -38,10 +42,6 @@ export function LeadsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
     void reload();
   }
 
-  async function change(id: string, next: string) {
-    await api(`/leads/${id}`, { method: "PATCH", body: JSON.stringify({ status: next }) });
-    void reload();
-  }
 
   return <PlatformShell allowedRoles={role === "ADMIN" ? ["ADMIN", "SUPPORT_MANAGER"] : ["MANAGER"]}>
     <div className="page-head">
@@ -66,8 +66,9 @@ export function LeadsPage({ role }: { role: "ADMIN" | "MANAGER" }) {
         <td>{lead.student_first_name ?? "—"} {lead.student_last_name ?? ""}<br/><span className="muted">{lead.grade_level ? `${lead.grade_level} клас` : ""}</span></td>
         <td>{lead.subject_name ?? "—"}</td>
         <td><strong>{sourceLabels[lead.source] ?? lead.source}</strong>{lead.source === "COURSE" && <div className="muted">{lead.source_course_title ?? "Курс"}{lead.source_topic_name ? ` · ${lead.source_topic_name}` : ""}{lead.source_test_percentage != null ? ` · ${Math.round(Number(lead.source_test_percentage))}%` : ""}</div>}</td>
-        <td><select className="select" value={lead.status} onChange={e=>change(lead.id,e.target.value)}>{statuses.map(value => <option key={value} value={value}>{statusLabels[value]}</option>)}</select></td>
+        <td><div className="row wrap-row"><span className="badge">{statusLabels[lead.status] ?? lead.status}</span><button type="button" className="btn secondary" onClick={()=>{setSelectedLead(lead);setSelectedStatus(lead.status)}}>Опрацювати</button></div>{lead.status==="LOST"&&lead.refusal_reason&&<small className="muted">{lead.refusal_reason}</small>}</td>
       </tr>)}</tbody>
     </table></div>}
+    {selectedLead && <LeadWorkflow key={selectedLead.id} lead={selectedLead} status={selectedStatus} role={role} onClose={()=>setSelectedLead(null)} onSaved={()=>void reload()} />}
   </PlatformShell>;
 }
