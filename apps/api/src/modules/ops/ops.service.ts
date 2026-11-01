@@ -528,6 +528,9 @@ export class OpsService {
       const studentId = dto.convertedStudentId ?? before.converted_student_id;
       const familyId = dto.convertedFamilyId ?? before.converted_family_id;
       const subjectId = dto.subjectId ?? before.subject_id;
+      if (dto.convertedStudentId && dto.convertedStudentId !== before.converted_student_id && (before.first_lesson_session_id || before.converted_enrollment_id)) {
+        throw new ConflictException({ code: "LEAD_STUDENT_ALREADY_SCHEDULED", message: "This lead already has a lesson or regular enrollment" });
+      }
       if (dto.subjectId) {
         const subject = await tx.execute(sql`SELECT 1 FROM subjects WHERE id=${dto.subjectId} AND status='ACTIVE' LIMIT 1`);
         if (!subject.rowCount) throw new BadRequestException({ code: "SUBJECT_NOT_ACTIVE", message: "Select an active subject" });
