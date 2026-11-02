@@ -636,6 +636,34 @@ async function run() {
   );
   assert.ok(regularLesson?.id, "funded regular lesson must be materialized");
 
+  const extraOptions = await request(`/sessions/${regularLesson.id}/extra-lesson/options?from=${scheduleDate}&days=28`, { cookie: parent.cookie });
+  expectStatus(extraOptions, 200, "parent extra lesson options");
+  assert.ok(extraOptions.payload?.paidSessionId && extraOptions.payload?.bookedSessionId, "extra lesson must identify a paid tail and following booking");
+  assert.ok(extraOptions.payload?.slots?.length > 0, "teacher must have a free slot before the paid tail");
+  const extraTime = extraOptions.payload.slots[0].startsAt;
+  expectStatus(await request(`/sessions/${regularLesson.id}/extra-lesson`, {
+    method: "POST", cookie: student.cookie, body: { startsAt: extraTime },
+  }), 403, "student cannot schedule an extra lesson");
+  const extraLesson = await request(`/sessions/${regularLesson.id}/extra-lesson`, {
+    method: "POST", cookie: parent.cookie, body: { startsAt: extraTime },
+  });
+  expectStatus(extraLesson, 201, "parent schedules extra lesson");
+  assert.equal(extraLesson.payload?.paidSessionId, extraOptions.payload.paidSessionId);
+  assert.equal(extraLesson.payload?.bookedSessionId, extraOptions.payload.bookedSessionId);
+  assert.equal(extraLesson.payload?.paidStartsAt, extraTime);
+  assert.equal(extraLesson.payload?.bookedStartsAt, extraOptions.payload.paidStartsAt);
+  const extraPaidDetail = await request(`/sessions/${extraLesson.payload.paidSessionId}`, { cookie: teacher.cookie });
+  const shiftedBookedDetail = await request(`/sessions/${extraLesson.payload.bookedSessionId}`, { cookie: parent.cookie });
+  expectStatus(extraPaidDetail, 200, "extra paid lesson detail");
+  expectStatus(shiftedBookedDetail, 200, "shifted booked lesson detail");
+  assert.equal(extraPaidDetail.payload.fundingStatus, "PAID");
+  assert.equal(shiftedBookedDetail.payload.fundingStatus, "BOOKED");
+  assert.equal(new Date(extraPaidDetail.payload.startsAt).toISOString(), extraTime);
+  assert.equal(new Date(shiftedBookedDetail.payload.startsAt).toISOString(), extraOptions.payload.paidStartsAt);
+  expectStatus(await request(`/sessions/${regularLesson.id}/extra-lesson`, {
+    method: "POST", cookie: parent.cookie, body: { startsAt: extraTime },
+  }), 409, "occupied extra lesson time must be rejected");
+
   const pastRegularAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
   pastRegularAt.setUTCHours(12, 0, 0, 0);
   const moveRegular = await request(`/sessions/${regularLesson.id}/reschedule`, {
