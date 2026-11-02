@@ -1390,13 +1390,17 @@ export class SchedulingService {
           throw new BadRequestException({ code: "PAST_RESCHEDULE_REQUIRES_MANUAL_MODE", message: "Historical lesson time can only be set through administrative rescheduling" });
         }
 
-        const local = formatInSchoolTimeZone(requestedStart);
-        const availability = await this.loadAvailabilitySnapshot(tx, session.actual_teacher_id, local.date, local.date);
-        if (!this.isTeacherAvailable(availability, local.date, isoDayOfWeek(local.date), local.time, durationMinutes)) {
-          throw new ConflictException({
-            code: "TEACHER_NOT_AVAILABLE",
-            message: "Teacher is not available at the requested time",
-          });
+        // A permitted administrative correction may use a closed availability hour.
+        // PostgreSQL overlap constraints still protect teacher and student calendars.
+        if (dto.mode !== "MANUAL") {
+          const local = formatInSchoolTimeZone(requestedStart);
+          const availability = await this.loadAvailabilitySnapshot(tx, session.actual_teacher_id, local.date, local.date);
+          if (!this.isTeacherAvailable(availability, local.date, isoDayOfWeek(local.date), local.time, durationMinutes)) {
+            throw new ConflictException({
+              code: "TEACHER_NOT_AVAILABLE",
+              message: "Teacher is not available at the requested time",
+            });
+          }
         }
 
         if (consumedPlaceholderId) {
