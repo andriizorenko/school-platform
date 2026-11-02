@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
-import { dateOnly, kyivLocalDateTimeToIso, timeOnly } from "../lib/format";
+import { dateOnly, kyivDateValue, kyivLocalDateTimeToIso, timeOnly } from "../lib/format";
 import { DateTimeFields24 } from "./date-time-fields-24";
 
 export type SessionActionRole = "ADMIN" | "MANAGER" | "TEACHER" | "PARENT" | "STUDENT";
@@ -37,7 +37,7 @@ export type SessionActionDetail = {
   };
 };
 
-type Action = "mark" | "first-payment" | "reschedule" | "admin-reschedule" | "substitute" | "undo-outcome" | null;
+type Action = "mark" | "first-payment" | "reschedule" | "admin-reschedule" | "extra-lesson" | "substitute" | "undo-outcome" | null;
 type RescheduleParty = "STUDENT" | "TEACHER";
 type RescheduleSituation = "ADVANCE" | "LATE" | "TECHNICAL";
 type RescheduleStep = "context" | "slot";
@@ -51,6 +51,16 @@ type FreeSlotsResponse = {
   to: string;
   slots: FreeSlot[];
   canMoveToEnd: boolean;
+};
+
+type ExtraLessonOptions = {
+  paidSessionId: string;
+  paidStartsAt: string;
+  bookedSessionId: string;
+  bookedStartsAt: string;
+  teacherId: string;
+  durationMinutes: number;
+  slots: FreeSlot[];
 };
 
 type SubstituteCandidate = {
@@ -98,6 +108,10 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotData, setSlotData] = useState<FreeSlotsResponse | null>(null);
   const [selectedSlot, setSelectedSlot] = useState("");
+  const [extraDate, setExtraDate] = useState(() => kyivDateValue());
+  const [extraData, setExtraData] = useState<ExtraLessonOptions | null>(null);
+  const [extraLoading, setExtraLoading] = useState(false);
+  const [extraSlot, setExtraSlot] = useState("");
   const [manualDate, setManualDate] = useState("");
   const [manualTime, setManualTime] = useState("");
   const [rescheduleAfterIncident, setRescheduleAfterIncident] = useState<null | "student-no-show" | "teacher-late-cancellation">(null);
@@ -134,7 +148,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
   }, [slotData]);
 
   useEffect(() => {
-    if (action !== "reschedule") return;
+    if (action !== "reschedule" && action !== "extra-lesson") return;
     const frame = window.requestAnimationFrame(() => {
       actionFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -154,6 +168,20 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
       })
       .finally(() => setSlotsLoading(false));
   }, [action, detail.id, rescheduleStep, slotDays]);
+
+  useEffect(() => {
+    if (action !== "extra-lesson") return;
+    let active = true;
+    setExtraLoading(true);
+    setExtraData(null);
+    setExtraSlot("");
+    setError("");
+    api<ExtraLessonOptions>(`/sessions/${detail.id}/extra-lesson/options?from=${encodeURIComponent(extraDate)}&days=1`)
+      .then((result) => { if (active) setExtraData(result); })
+      .catch((exception: any) => { if (active) setError(exception?.message ?? "Не вдалося знайти вільні години"); })
+      .finally(() => { if (active) setExtraLoading(false); });
+    return () => { active = false; };
+  }, [action, detail.id, extraDate]);
 
   useEffect(() => {
     if (action !== "first-payment") return;
@@ -224,6 +252,11 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         setTeacherCompensationGranted(false);
         setRescheduleStep("context");
       }
+    }
+    if (next === "extra-lesson") {
+      setExtraDate(kyivDateValue());
+      setExtraData(null);
+      setExtraSlot("");
     }
     if (next === "admin-reschedule") {
       setManualDate("");
@@ -466,6 +499,15 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     }));
   }
 
+  async function submitExtraLesson(event: FormEvent) {
+    event.preventDefault();
+    if (!extraSlot) { setError("Оберіть вільну годину викладача."); return; }
+    await finish(() => api(`/sessions/${detail.id}/extra-lesson`, {
+      method: "POST",
+      body: JSON.stringify({ startsAt: extraSlot }),
+    }));
+  }
+
   async function assignSubstitute(event: FormEvent) {
     event.preventDefault();
     if (!selectedSubstitute) {
@@ -676,6 +718,43 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
     );
   }
 
+  if (action === "extra-lesson") {
+    return (
+      <form className="stack session-action-form" onSubmit={submitExtraLesson}>
+        <div className="row action-form-head">
+          <button type="button" className="link-button" onClick={() => open(null)}>← Назад</button>
+          <strong>Додаткове заняття</strong>
+        </div>
+        <p className="muted form-note">Останній оплачений урок відбудеться у вибрану вільну годину. Найближчий заброньований урок займе його колишній час. Регулярний графік і баланс не зміняться.</p>
+        <div className="field">
+          <label htmlFor="extra-lesson-date">Дата додаткового заняття</label>
+          <input id="extra-lesson-date" className="input" type="date" min={kyivDateValue()} value={extraDate} onChange={(event) => setExtraDate(event.target.value)} required />
+        </div>
+        {extraLoading ? <div className="empty compact-empty">Шукаємо вільні години…</div> : extraData ? (
+          <>
+            <div className="notice-card">
+              <strong>Що зміниться</strong>
+              <div className="muted" style={{marginTop:6}}>Оплачений урок: {dateOnly(extraData.paidStartsAt)} о {timeOnly(extraData.paidStartsAt)} → вибраний час.</div>
+              <div className="muted" style={{marginTop:4}}>Заброньований урок: {dateOnly(extraData.bookedStartsAt)} о {timeOnly(extraData.bookedStartsAt)} → {dateOnly(extraData.paidStartsAt)} о {timeOnly(extraData.paidStartsAt)}.</div>
+            </div>
+            <div className="field">
+              <label>Вільні години викладача</label>
+              {extraData.slots.length ? (
+                <div className="free-slot-times">
+                  {extraData.slots.map((slot) => (
+                    <button key={slot.startsAt} type="button" className={`slot-button ${extraSlot === slot.startsAt ? "selected" : ""}`} onClick={() => setExtraSlot(slot.startsAt)}>{timeOnly(slot.startsAt)}</button>
+                  ))}
+                </div>
+              ) : <div className="notice-card">На цю дату вільних годин до останнього оплаченого уроку немає. Виберіть іншу дату.</div>}
+            </div>
+          </>
+        ) : null}
+        {error && <div className="error">{error}</div>}
+        <button className="btn" disabled={busy || extraLoading || !extraSlot}>{busy ? "Записуємо…" : "Запланувати додаткове заняття"}</button>
+      </form>
+    );
+  }
+
   if (action === "admin-reschedule") {
     return (
       <form className="stack session-action-form admin-reschedule-form" onSubmit={(event) => { event.preventDefault(); void submitAdminReschedule(); }}>
@@ -789,6 +868,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
         {!detail.capabilities.canMark && markDisabledText && <div className="muted form-note">{markDisabledText}</div>}
       </>}
       {detail.capabilities.canReschedule && <button disabled={busy} className="btn secondary" onClick={() => open("reschedule")}>Перенести</button>}
+      {detail.capabilities.canReschedule && detail.sessionType === "REGULAR" && detail.enrollmentId && new Date(detail.startsAt) > new Date() && <button disabled={busy} className="btn secondary" onClick={() => open("extra-lesson")}>Додаткове заняття</button>}
       {detail.capabilities.canRescheduleToPast && <button disabled={busy} className="btn secondary" onClick={() => open("admin-reschedule")}>Адміністративне перенесення</button>}
       {detail.capabilities.canAssignSubstitute && <button disabled={busy} className="btn secondary" onClick={() => open("substitute")}>Призначити заміну</button>}
       {detail.capabilities.canUndoOutcome && <button disabled={busy} className="btn secondary danger-outline" onClick={() => open("undo-outcome")}>{undoOutcomeLabel}</button>}
