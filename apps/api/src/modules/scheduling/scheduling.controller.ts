@@ -7,6 +7,7 @@ import { RequirePermissions } from "../iam/require-permissions.decorator";
 import { CreateFirstLessonDto } from "./dto/create-first-lesson.dto";
 import { RescheduleSessionDto } from "./dto/reschedule-session.dto";
 import { FreeSlotsQueryDto } from "./dto/free-slots-query.dto";
+import { ScheduleExtraLessonDto } from "./dto/schedule-extra-lesson.dto";
 import { SetRegularScheduleDto } from "./dto/set-regular-schedule.dto";
 import { AssignSubstituteDto } from "./dto/assign-substitute.dto";
 import { ChangePrimaryTeacherDto } from "./dto/change-primary-teacher.dto";
@@ -88,6 +89,27 @@ export class SchedulingController {
   ) {
     return this.scheduling.rescheduleSession(sessionId, dto, user, requestId);
   }
+  @RequirePermissions("lesson.reschedule")
+  @Get("sessions/:sessionId/extra-lesson/options")
+  extraLessonOptions(
+    @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Query() query: FreeSlotsQueryDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.scheduling.extraLessonOptions(sessionId, query, user);
+  }
+
+  @RequirePermissions("lesson.reschedule")
+  @Post("sessions/:sessionId/extra-lesson")
+  scheduleExtraLesson(
+    @Param("sessionId", ParseUUIDPipe) sessionId: string,
+    @Body() dto: ScheduleExtraLessonDto,
+    @CurrentUser() user: AuthUser,
+    @RequestId() requestId?: string,
+  ) {
+    return this.scheduling.scheduleExtraLesson(sessionId, dto, user, requestId);
+  }
+
   @RequirePermissions("lesson.reschedule")
   @Get("sessions/:sessionId/substitute-candidates")
   substituteCandidates(
