@@ -689,7 +689,7 @@ export function SessionActions({ role, detail, onSuccess, onReportReminder }: Pr
           <div>
             <div className="admin-reschedule-kicker">Службова дія</div>
             <strong>Ручне перенесення без часових обмежень</strong>
-            <div className="muted" style={{marginTop:5}}>Можна вибрати минулий, поточний або майбутній час. Доступність викладача й конфлікти з іншими заняттями все одно перевіряються. Дія потрапляє в аудит.</div>
+            <div className="muted" style={{marginTop:5}}>Можна вибрати минулий, поточний або майбутній час. Можна вибрати навіть закриту годину викладача. Накладення на інші заняття заборонені. Дія потрапляє в аудит.</div>
           </div>
         </div>
 
