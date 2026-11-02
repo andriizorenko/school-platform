@@ -1508,19 +1508,25 @@ export class SchedulingService {
     const paid = paidResult.rows[0] as any;
     await this.assertCanRescheduleSession(this.db, { ...paid, starts_at: new Date(paid.starts_at), ends_at: new Date(paid.ends_at) }, actor);
     const bookedResult = await this.db.execute(sql`
-      SELECT id, starts_at FROM live_sessions
+      SELECT id, starts_at, ends_at, actual_teacher_id FROM live_sessions
       WHERE enrollment_id = ${source.enrollment_id} AND session_type = 'REGULAR'
         AND status = 'SCHEDULED' AND funding_status = 'BOOKED'
         AND starts_at > ${paid.starts_at}
       ORDER BY starts_at ASC, id ASC LIMIT 1
     `);
     if (!bookedResult.rowCount) throw new ConflictException({ code: "EXTRA_LESSON_NO_BOOKED_TAIL", message: "No following booked lesson is available" });
+    const booked = bookedResult.rows[0] as any;
+    const paidDuration = new Date(paid.ends_at).getTime() - new Date(paid.starts_at).getTime();
+    const bookedDuration = new Date(booked.ends_at).getTime() - new Date(booked.starts_at).getTime();
+    if (booked.actual_teacher_id !== paid.actual_teacher_id || bookedDuration !== paidDuration) {
+      throw new ConflictException({ code: "EXTRA_LESSON_TAIL_MISMATCH", message: "The following booked lesson has a different teacher or duration" });
+    }
     const free = await this.listFreeSlots(paid.id, query, actor);
     return {
       paidSessionId: paid.id,
       paidStartsAt: new Date(paid.starts_at).toISOString(),
-      bookedSessionId: (bookedResult.rows[0] as any).id,
-      bookedStartsAt: new Date((bookedResult.rows[0] as any).starts_at).toISOString(),
+      bookedSessionId: booked.id,
+      bookedStartsAt: new Date(booked.starts_at).toISOString(),
       teacherId: free.teacherId,
       durationMinutes: free.durationMinutes,
       slots: free.slots.filter((slot) => new Date(slot.startsAt) < new Date(paid.starts_at)),
