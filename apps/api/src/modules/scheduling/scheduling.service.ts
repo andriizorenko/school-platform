@@ -46,6 +46,7 @@ import { IamService } from "../iam/iam.service";
 import type { CreateFirstLessonDto } from "./dto/create-first-lesson.dto";
 import type { RescheduleSessionDto } from "./dto/reschedule-session.dto";
 import type { FreeSlotsQueryDto } from "./dto/free-slots-query.dto";
+import type { ScheduleExtraLessonDto } from "./dto/schedule-extra-lesson.dto";
 import type { AssignSubstituteDto } from "./dto/assign-substitute.dto";
 import type { ChangePrimaryTeacherDto } from "./dto/change-primary-teacher.dto";
 import type { StudentPauseDto } from "./dto/student-pause.dto";
@@ -1479,6 +1480,147 @@ export class SchedulingService {
         if (constraint === "student_session_no_overlap") {
           throw new ConflictException({ code: "STUDENT_SESSION_CONFLICT", message: "Student already has a lesson in this time range" });
         }
+      }
+      throw error;
+    }
+  }
+
+  async extraLessonOptions(sessionId: string, query: FreeSlotsQueryDto, actor: AuthUser) {
+    const sourceResult = await this.db.execute(sql`
+      SELECT id, student_id, enrollment_id, actual_teacher_id, starts_at, ends_at, status, session_type
+      FROM live_sessions WHERE id = ${sessionId} LIMIT 1
+    `);
+    if (!sourceResult.rowCount) throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
+    const source = sourceResult.rows[0] as any;
+    if (source.session_type !== "REGULAR" || !source.enrollment_id || source.status !== "SCHEDULED") {
+      throw new ConflictException({ code: "EXTRA_LESSON_REQUIRES_REGULAR_SCHEDULE", message: "Choose a scheduled regular lesson" });
+    }
+    await this.assertCanRescheduleSession(this.db, { ...source, starts_at: new Date(source.starts_at), ends_at: new Date(source.ends_at) }, actor);
+
+    const paidResult = await this.db.execute(sql`
+      SELECT id, student_id, enrollment_id, actual_teacher_id, starts_at, ends_at
+      FROM live_sessions
+      WHERE enrollment_id = ${source.enrollment_id} AND session_type = 'REGULAR'
+        AND status = 'SCHEDULED' AND funding_status = 'PAID' AND starts_at > now()
+      ORDER BY starts_at DESC, id DESC LIMIT 1
+    `);
+    if (!paidResult.rowCount) throw new ConflictException({ code: "EXTRA_LESSON_NO_PAID_TAIL", message: "No future paid lesson is available" });
+    const paid = paidResult.rows[0] as any;
+    await this.assertCanRescheduleSession(this.db, { ...paid, starts_at: new Date(paid.starts_at), ends_at: new Date(paid.ends_at) }, actor);
+    const bookedResult = await this.db.execute(sql`
+      SELECT id, starts_at FROM live_sessions
+      WHERE enrollment_id = ${source.enrollment_id} AND session_type = 'REGULAR'
+        AND status = 'SCHEDULED' AND funding_status = 'BOOKED'
+        AND starts_at > ${paid.starts_at}
+      ORDER BY starts_at ASC, id ASC LIMIT 1
+    `);
+    if (!bookedResult.rowCount) throw new ConflictException({ code: "EXTRA_LESSON_NO_BOOKED_TAIL", message: "No following booked lesson is available" });
+    const free = await this.listFreeSlots(paid.id, query, actor);
+    return {
+      paidSessionId: paid.id,
+      paidStartsAt: new Date(paid.starts_at).toISOString(),
+      bookedSessionId: (bookedResult.rows[0] as any).id,
+      bookedStartsAt: new Date((bookedResult.rows[0] as any).starts_at).toISOString(),
+      teacherId: free.teacherId,
+      durationMinutes: free.durationMinutes,
+      slots: free.slots.filter((slot) => new Date(slot.startsAt) < new Date(paid.starts_at)),
+    };
+  }
+
+  async scheduleExtraLesson(sessionId: string, dto: ScheduleExtraLessonDto, actor: AuthUser, requestId?: string) {
+    const requestedStart = new Date(dto.startsAt);
+    if (Number.isNaN(requestedStart.getTime()) || requestedStart <= new Date()) {
+      throw new BadRequestException({ code: "EXTRA_LESSON_FUTURE_TIME_REQUIRED", message: "Choose a future time for the extra lesson" });
+    }
+    try {
+      return await this.db.transaction(async (tx) => {
+        const sourceResult = await tx.execute(sql`
+          SELECT id, student_id, enrollment_id, actual_teacher_id, starts_at, ends_at, status, session_type
+          FROM live_sessions WHERE id = ${sessionId} LIMIT 1
+        `);
+        if (!sourceResult.rowCount) throw new NotFoundException({ code: "SESSION_NOT_FOUND", message: "Lesson not found" });
+        const source = sourceResult.rows[0] as any;
+        if (source.session_type !== "REGULAR" || !source.enrollment_id || source.status !== "SCHEDULED") {
+          throw new ConflictException({ code: "EXTRA_LESSON_REQUIRES_REGULAR_SCHEDULE", message: "Choose a scheduled regular lesson" });
+        }
+        // Serialize this operation with schedule changes and funding refreshes for this enrollment.
+        const enrollment = await tx.execute(sql`
+          SELECT id, status FROM student_subject_enrollments WHERE id = ${source.enrollment_id} FOR UPDATE
+        `);
+        if (!enrollment.rowCount || (enrollment.rows[0] as any).status !== "ACTIVE") {
+          throw new ConflictException({ code: "EXTRA_LESSON_ENROLLMENT_INACTIVE", message: "The regular enrollment is not active" });
+        }
+        const allResult = await tx.execute(sql`
+          SELECT id, student_id, enrollment_id, actual_teacher_id, session_type,
+                 funding_status, status, starts_at, ends_at
+          FROM live_sessions
+          WHERE enrollment_id = ${source.enrollment_id} AND session_type = 'REGULAR'
+            AND status = 'SCHEDULED' AND starts_at > now()
+          ORDER BY starts_at ASC, id ASC FOR UPDATE
+        `);
+        const sessions = allResult.rows as any[];
+        const selected = sessions.find((row) => row.id === sessionId);
+        if (!selected) throw new ConflictException({ code: "EXTRA_LESSON_SOURCE_CHANGED", message: "The selected lesson has changed; reload the calendar" });
+        await this.assertCanRescheduleSession(tx, { ...selected, starts_at: new Date(selected.starts_at), ends_at: new Date(selected.ends_at) }, actor);
+        const paid = sessions.filter((row) => row.funding_status === "PAID").at(-1);
+        if (!paid) throw new ConflictException({ code: "EXTRA_LESSON_NO_PAID_TAIL", message: "No future paid lesson is available" });
+        await this.assertCanRescheduleSession(tx, { ...paid, starts_at: new Date(paid.starts_at), ends_at: new Date(paid.ends_at) }, actor);
+        const paidStart = new Date(paid.starts_at);
+        const paidEnd = new Date(paid.ends_at);
+        if (requestedStart >= paidStart) {
+          throw new ConflictException({ code: "EXTRA_LESSON_MUST_BE_EARLIER", message: "The extra lesson must take place before the last paid lesson" });
+        }
+        const booked = sessions.find((row) => row.funding_status === "BOOKED" && new Date(row.starts_at) > paidStart);
+        if (!booked) throw new ConflictException({ code: "EXTRA_LESSON_NO_BOOKED_TAIL", message: "No following booked lesson is available" });
+        const durationMinutes = Math.round((paidEnd.getTime() - paidStart.getTime()) / 60_000);
+        const bookedDuration = Math.round((new Date(booked.ends_at).getTime() - new Date(booked.starts_at).getTime()) / 60_000);
+        if (booked.actual_teacher_id !== paid.actual_teacher_id || bookedDuration !== durationMinutes) {
+          throw new ConflictException({ code: "EXTRA_LESSON_TAIL_MISMATCH", message: "The following booked lesson has a different teacher or duration" });
+        }
+        const requestedEnd = addMinutes(requestedStart, durationMinutes);
+        const local = formatInSchoolTimeZone(requestedStart);
+        const availability = await this.loadAvailabilitySnapshot(tx, paid.actual_teacher_id, local.date, local.date);
+        if (!this.isTeacherAvailable(availability, local.date, isoDayOfWeek(local.date), local.time, durationMinutes)) {
+          throw new ConflictException({ code: "TEACHER_NOT_AVAILABLE", message: "Teacher is not available at the requested time" });
+        }
+        const busy = await this.loadBusyIntervals(tx, paid, requestedStart, requestedEnd);
+        if (!this.intervalIsFree(busy, requestedStart, requestedEnd)) {
+          throw new ConflictException({ code: "EXTRA_LESSON_TIME_CONFLICT", message: "Teacher or student already has a lesson at this time" });
+        }
+
+        // The paid reservation stays attached to the paid session. Move the nearest booked
+        // occurrence into its vacated time, preserving the recurring schedule and credit order.
+        await tx.update(liveSessions).set({ startsAt: requestedStart, endsAt: requestedEnd, updatedAt: new Date() }).where(eq(liveSessions.id, paid.id));
+        const bookedStart = new Date(booked.starts_at);
+        const bookedEnd = new Date(booked.ends_at);
+        await tx.update(liveSessions).set({ startsAt: paidStart, endsAt: paidEnd, updatedAt: new Date() }).where(eq(liveSessions.id, booked.id));
+        await tx.insert(sessionReschedules).values([
+          { sessionId: paid.id, fromStartAt: paidStart, fromEndAt: paidEnd, toStartAt: requestedStart, toEndAt: requestedEnd, reason: "OTHER", mode: "FREE_SLOT", comment: "Додаткове заняття до регулярного графіка", initiatedBy: actor.id },
+          { sessionId: booked.id, fromStartAt: bookedStart, fromEndAt: bookedEnd, toStartAt: paidStart, toEndAt: paidEnd, reason: "SCHOOL_REASON", mode: "FREE_SLOT", comment: "Заброньований урок займає місце перенесеного оплаченого", initiatedBy: actor.id },
+        ]);
+        await this.audit.record({
+          actorUserId: actor.id, actorRoleCode: actor.roles[0], action: "SCHEDULE_EXTRA_LESSON",
+          entityType: "LiveSession", entityId: paid.id, requestId,
+          beforeData: { paidStartsAt: paidStart, bookedStartsAt: bookedStart },
+          afterData: { paidStartsAt: requestedStart, bookedStartsAt: paidStart, paidSessionId: paid.id, bookedSessionId: booked.id },
+        }, tx);
+        const notificationContext = await this.loadStudentNotificationContext(tx, paid.student_id);
+        await this.outbox.publishNotification({
+          aggregateType: "LiveSession", aggregateId: paid.id,
+          recipientUserIds: [paid.actual_teacher_id, notificationContext.parentUserId, notificationContext.studentUserId].filter((id): id is string => Boolean(id) && id !== actor.id),
+          eventType: "LESSON_RESCHEDULED", title: "Додаткове заняття заплановано",
+          body: `${notificationContext.studentFullName} · додаткове заняття ${requestedStart.toISOString()}, наступний заброньований урок ${paidStart.toISOString()}`,
+          actionPath: actor.roles.includes("PARENT") ? "/teacher/schedule" : "/parent",
+          entityType: "LiveSession", entityId: paid.id,
+          data: { studentId: paid.student_id, paidSessionId: paid.id, bookedSessionId: booked.id, from: paidStart.toISOString(), to: requestedStart.toISOString() },
+        }, tx);
+        return { paidSessionId: paid.id, paidStartsAt: requestedStart.toISOString(), bookedSessionId: booked.id, bookedStartsAt: paidStart.toISOString() };
+      });
+    } catch (error) {
+      if (isPgExclusionViolation(error)) {
+        const constraint = pgConstraint(error);
+        if (constraint === "teacher_session_no_overlap") throw new ConflictException({ code: "TEACHER_SESSION_CONFLICT", message: "Teacher already has a lesson at this time" });
+        if (constraint === "student_session_no_overlap") throw new ConflictException({ code: "STUDENT_SESSION_CONFLICT", message: "Student already has a lesson at this time" });
       }
       throw error;
     }
